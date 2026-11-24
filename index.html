@@ -1,0 +1,2081 @@
+<!doctype html><html lang="en"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Traffic Sandbox</title><meta name="description" content="A traffic simulator in your browser. Build roads, time signals, add flyovers or import a real OpenStreetMap area, then compare before and after."><meta property="og:title" content="Traffic Sandbox"><meta property="og:description" content="A traffic simulator in your browser. Build roads, time signals, add flyovers or import a real OpenStreetMap area, then compare before and after."><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%9A%A6%3C/text%3E%3C/svg%3E">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700;800&family=Overpass+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: full-bleed live map, a signage-style top bar, a floating tool rail on the left, a tabbed results/edit panel on the right.
+   Type: Overpass (derived from US highway signage lettering) for UI, Overpass Mono for live numbers. */
+:root {
+  --paper: #eef0ea;        /* map ground */
+  --paper-grid: rgba(60, 72, 60, 0.06);
+  --block: #e3e7de;
+  --road: #ffffff;
+  --road-edge: #c9cec4;
+  --road-service: #f6f3ea;
+  --road-hwy: #fdf1cf;
+  --hwy-edge: #e0c77a;
+  --mark: #c3c8bd;
+  --center: #e2b13c;
+  --bridge: #fbfbf8;
+  --bridge-edge: #8f978b;
+  --shadow: rgba(30, 40, 30, 0.22);
+  --ink: #1d2a22;
+  --ink-2: #4c5a50;
+  --muted: #7d887f;
+  --surface: #fbfcf8;
+  --surface-2: #f1f3ec;
+  --line: #d9ddd3;
+  --accent: #0f6b4b;      /* road-sign green */
+  --accent-ink: #ffffff;
+  --accent-soft: #dcefe6;
+  --good: #1f8a52; --warn: #c98a0b; --serious: #d0602a; --critical: #c42b2b;
+  --good-soft: #e1f3e8; --warn-soft: #fbf0d6; --serious-soft: #fbe5d9; --critical-soft: #f8dcdc;
+  --sig-green: #18b35c; --sig-amber: #f0a500; --sig-red: #e0302f; --sig-body: #26302a;
+  --sel: #1b74e4;
+  --font-ui: "Overpass", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Overpass Mono", ui-monospace, Menlo, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #161b19; --paper-grid: rgba(220, 235, 225, 0.04); --block: #1b211e;
+  --road: #3a423e; --road-edge: #232a27; --road-service: #333a36; --road-hwy: #4a4636; --hwy-edge: #6b6140;
+  --mark: #6d7871; --center: #c9a03e; --bridge: #4a534e; --bridge-edge: #9aa59e; --shadow: rgba(0, 0, 0, 0.5);
+  --ink: #e7ede9; --ink-2: #b4c0b8; --muted: #84928a; --surface: #1d2421; --surface-2: #252d29; --line: #333d38;
+  --accent: #3fbf8a; --accent-ink: #0b1d15; --accent-soft: #1e3a2f;
+  --good: #47c27e; --warn: #e3b13f; --serious: #ec8a55; --critical: #f0605c;
+  --good-soft: #1d3527; --warn-soft: #3a3120; --serious-soft: #3d281d; --critical-soft: #3e2122;
+  --sig-body: #0d1110; --sel: #5aa2ff; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --paper: #161b19; --paper-grid: rgba(220, 235, 225, 0.04); --block: #1b211e;
+  --road: #3a423e; --road-edge: #232a27; --road-service: #333a36; --road-hwy: #4a4636; --hwy-edge: #6b6140;
+  --mark: #6d7871; --center: #c9a03e; --bridge: #4a534e; --bridge-edge: #9aa59e; --shadow: rgba(0, 0, 0, 0.5);
+  --ink: #e7ede9; --ink-2: #b4c0b8; --muted: #84928a; --surface: #1d2421; --surface-2: #252d29; --line: #333d38;
+  --accent: #3fbf8a; --accent-ink: #0b1d15; --accent-soft: #1e3a2f;
+  --good: #47c27e; --warn: #e3b13f; --serious: #ec8a55; --critical: #f0605c;
+  --good-soft: #1d3527; --warn-soft: #3a3120; --serious-soft: #3d281d; --critical-soft: #3e2122;
+  --sig-body: #0d1110; --sel: #5aa2ff; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.45 var(--font-ui); overflow: hidden; }
+button, select, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--sel); outline-offset: 2px; }
+
+#app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+
+/* top bar */
+#top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--surface); border-bottom: 1px solid var(--line);
+  padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 800; letter-spacing: 0.01em; font-size: 16px; white-space: nowrap; }
+.brand .sign { width: 28px; height: 28px; border-radius: 6px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
+.grp { display: flex; align-items: center; gap: 8px; }
+.lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+select.ctl, .ctl { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+#play { display: flex; align-items: center; gap: 8px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px; padding: 7px 16px 7px 12px; font-weight: 700; cursor: pointer; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+.seg button { border: 0; background: transparent; padding: 5px 9px; cursor: pointer; font-family: var(--font-num); font-size: 12px; color: var(--ink-2); }
+.seg button.on { background: var(--ink); color: var(--surface); }
+#clock { font-family: var(--font-num); font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+#volume { width: 120px; accent-color: var(--accent); }
+.spacer { flex: 1; }
+
+/* main area */
+#main { position: relative; display: grid; grid-template-columns: 1fr 360px; min-height: 0; }
+#stage { position: relative; min-width: 0; min-height: 0; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: default; }
+#cv.drawing { cursor: crosshair; }
+#cv.deleting { cursor: not-allowed; }
+#cv.panning { cursor: grab; }
+#cv.panning.grabbing, #cv.grabbing { cursor: grabbing; }
+
+/* tool rail */
+#rail { position: absolute; top: 14px; left: max(14px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 6px; z-index: 3; }
+.tool { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 70px; padding: 8px 4px 6px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  cursor: pointer; font-size: 11px; font-weight: 700; color: var(--ink-2); box-shadow: 0 1px 3px var(--shadow); }
+.tool svg { width: 22px; height: 22px; }
+.undo-row { display: flex; gap: 4px; width: 70px; margin-top: 4px; }
+.tool.mini { width: auto; flex: 1; padding: 6px 2px 4px; font-size: 10px; }
+.tool.mini svg { width: 16px; height: 16px; }
+.tool:disabled { opacity: 0.4; cursor: default; }
+.tool.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.tool kbd { font-family: var(--font-num); font-size: 9px; opacity: 0.6; }
+#drawOpts { position: absolute; top: 14px; left: calc(max(14px, env(safe-area-inset-left, 0px)) + 82px); z-index: 3; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 10px 12px; box-shadow: 0 2px 8px var(--shadow); display: grid; gap: 8px; max-width: 300px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 4px 10px; cursor: pointer; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.chip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+.chip .sw { width: 18px; height: 8px; border-radius: 2px; border: 1px solid var(--road-edge); }
+
+#hint { position: absolute; left: 50%; transform: translateX(-50%); top: 14px; background: var(--ink); color: var(--surface); border-radius: 999px; padding: 7px 14px; font-size: 12.5px; z-index: 3; max-width: calc(100% - 32px); text-align: center; }
+#legend { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); bottom: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; z-index: 3; font-size: 11.5px; color: var(--ink-2); display: grid; gap: 5px; box-shadow: 0 1px 3px var(--shadow); }
+#legend .row { display: flex; align-items: center; gap: 7px; }
+#legend .ramp { width: 70px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--good), var(--warn), var(--critical)); }
+.lg-car { width: 14px; height: 7px; border-radius: 2px; background: var(--ink-2); position: relative; }
+.lg-car::after { content: ""; position: absolute; left: -1px; top: 1px; width: 2px; height: 5px; background: var(--sig-red); border-radius: 1px; }
+.lg-dot { width: 9px; height: 9px; border-radius: 50%; }
+#legendToggle { background: none; border: 0; padding: 0; cursor: pointer; color: var(--muted); font-size: 11px; text-align: left; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+
+#tip { position: absolute; z-index: 4; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 14px var(--shadow); min-width: 160px; max-width: 240px; }
+#tip b { display: block; font-size: 13px; margin-bottom: 3px; }
+#tip .kv { display: flex; justify-content: space-between; gap: 12px; color: var(--ink-2); }
+#tip .kv span:last-child { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink); }
+#tip .note { margin-top: 4px; color: var(--muted); font-size: 11px; }
+
+#toast { position: absolute; top: 58px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: 9px 16px; border-radius: 10px; z-index: 6; max-width: min(560px, calc(100% - 32px)); font-size: 13px; }
+
+/* side panel */
+#panel { background: var(--surface); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+#tabs { display: flex; border-bottom: 1px solid var(--line); padding: 0 8px; }
+#tabs button { flex: 1; border: 0; background: none; padding: 11px 6px 9px; cursor: pointer; font-weight: 700; color: var(--muted); border-bottom: 3px solid transparent; font-size: 13px; }
+#tabs button.on { color: var(--ink); border-bottom-color: var(--accent); }
+.pane { overflow-y: auto; padding: 14px 16px 22px; display: grid; gap: 14px; align-content: start; min-height: 0; flex: 1; }
+h2 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 800; }
+.small { font-size: 12px; color: var(--muted); }
+.status { border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 6px; border: 1px solid var(--line); }
+.status .pill { justify-self: start; display: inline-flex; align-items: center; gap: 7px; font-weight: 800; font-size: 13px; padding: 3px 10px 2px; border-radius: 999px; }
+.status .pill i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.status p { margin: 0; color: var(--ink-2); font-size: 13px; }
+.st-good { background: var(--good-soft); } .st-good .pill { color: var(--good); background: var(--surface); }
+.st-warn { background: var(--warn-soft); } .st-warn .pill { color: var(--warn); background: var(--surface); }
+.st-serious { background: var(--serious-soft); } .st-serious .pill { color: var(--serious); background: var(--surface); }
+.st-critical { background: var(--critical-soft); } .st-critical .pill { color: var(--critical); background: var(--surface); }
+.st-idle { background: var(--surface-2); } .st-idle .pill { color: var(--muted); background: var(--surface); }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 700; cursor: pointer; justify-self: start; font-size: 13px; }
+
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tile { background: var(--surface-2); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 1px; }
+.tile .k { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.tile .v { font-family: var(--font-num); font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.tile .v small { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 3px; letter-spacing: 0; }
+.tile .sub { font-size: 11px; color: var(--muted); }
+.delta { font-size: 11.5px; font-weight: 700; font-family: var(--font-num); min-height: 16px; }
+.delta.better { color: var(--good); } .delta.worse { color: var(--critical); } .delta.same { color: var(--muted); }
+
+.compare { border: 1px dashed var(--line); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 8px; }
+.btn { border: 1px solid var(--line); background: var(--surface-2); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: 13px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.danger { color: var(--critical); }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.chart { display: grid; gap: 4px; position: relative; }
+.chart .t { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.chart canvas { width: 100%; height: 74px; display: block; }
+.ctip { position: absolute; top: 18px; pointer-events: none; background: var(--ink); color: var(--surface); font-size: 11px; padding: 2px 7px; border-radius: 5px; font-family: var(--font-num); white-space: nowrap; }
+
+/* inspector */
+#inspector { display: grid; gap: 10px; }
+.ins-head { display: grid; gap: 2px; }
+.ins-head .name { font-size: 17px; font-weight: 800; }
+.ins-head .meta { font-size: 12px; color: var(--muted); }
+.field { display: grid; gap: 5px; }
+.field > label, .field > .flabel { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.row .grow { flex: 1; }
+input[type=range] { flex: 1; accent-color: var(--accent); min-width: 90px; }
+.val { min-width: 60px; text-align: right; font-family: var(--font-num); font-size: 12.5px; }
+.box { background: var(--surface-2); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 8px; }
+.box h3 { margin: 0; font-size: 13px; font-weight: 800; }
+.phase { display: grid; gap: 2px; }
+.mv { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mv td { padding: 3px 2px; text-align: center; }
+.mv td:first-child { text-align: left; color: var(--ink-2); font-weight: 600; }
+.mv tr:first-child td { color: var(--muted); font-size: 11px; }
+.live { font-size: 12px; color: var(--ink-2); background: var(--surface-2); border-radius: 8px; padding: 7px 10px; font-family: var(--font-num); }
+.empty { display: grid; gap: 10px; color: var(--ink-2); }
+.empty ul { margin: 0; padding-left: 18px; display: grid; gap: 5px; font-size: 13px; }
+
+textarea { width: 100%; height: 92px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; font: 11px/1.35 var(--font-num); padding: 7px; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+details summary { cursor: pointer; font-weight: 700; font-size: 13px; }
+details { display: grid; gap: 8px; }
+a { color: var(--accent); }
+
+/* coach */
+#coach { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(15, 25, 20, 0.35); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+#coach .card { background: var(--surface); border-radius: 14px; padding: 20px 22px; max-width: 420px; display: grid; gap: 10px; box-shadow: 0 10px 40px var(--shadow); }
+#coach .step { font-family: var(--font-num); font-size: 12px; color: var(--muted); }
+#coach h3 { margin: 0; font-size: 19px; font-weight: 800; text-wrap: balance; }
+#coach p { margin: 0; color: var(--ink-2); }
+
+@media (max-width: 820px) {
+  body { overflow: auto; }
+  #app { height: auto; min-height: 100%; }
+  #main { grid-template-columns: 1fr; grid-template-rows: 62vh auto; }
+  #panel { border-left: 0; border-top: 1px solid var(--line); }
+  #rail { flex-direction: row; }
+  .tool { width: 58px; }
+  #drawOpts { top: 78px; left: max(14px, env(safe-area-inset-left, 0px)); }
+  #legend { display: none; }
+  #hint { display: none; }
+  #toast { top: 84px; }
+  #volume { width: 90px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div id="app">
+  <header id="top">
+    <div class="brand"><span class="sign"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="5" y="1" width="6" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="4.5" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="11.5" r="1.3" fill="currentColor"/></svg></span>Traffic Sandbox</div>
+    <div class="grp">
+      <select id="preset" class="ctl" aria-label="Scenario">
+        <option value="grid">City grid, 9 signals</option>
+        <option value="arterial">Main road with side streets</option>
+        <option value="single">Single crossroads</option>
+        <option value="busy">Overloaded crossroads</option>
+        <option value="bottleneck">Lane drop bottleneck</option>
+        <option value="blank">Blank canvas</option>
+      </select>
+    </div>
+    <div class="grp">
+      <button id="play"><svg id="playIcon" width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="1" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="8.5" y="1" width="3.5" height="12" rx="1" fill="currentColor"/></svg><span id="playLbl">Pause</span></button>
+      <div class="seg" id="speeds" role="group" aria-label="Simulation speed"></div>
+      <span id="clock">0:00:00</span>
+    </div>
+    <div class="grp"><span class="lbl">Traffic</span><input type="range" id="volume" min="0" max="300" step="5" value="100" aria-label="Traffic volume"><span class="val" id="volumeV" style="min-width:42px">100%</span></div>
+    <div class="spacer"></div>
+    <button class="btn" id="helpBtn">How it works</button>
+  </header>
+
+  <div id="main">
+    <div id="stage">
+      <canvas id="cv"></canvas>
+      <nav id="rail" aria-label="Tools">
+        <button class="tool on" data-tool="select" title="Select and edit (V)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 3l14 7-6 2-2 6z"/></svg>Select<kbd>V</kbd></button>
+        <button class="tool" data-tool="pan" title="Move the map (H). Arrow keys also move it."><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 10.5V4a1.5 1.5 0 0 1 3 0v6.5"/><path d="M14 10.5V5.5a1.5 1.5 0 0 1 3 0V13"/><path d="M8 11.5V9.5a1.5 1.5 0 0 0-3 0V14c0 4 2.5 7 6.5 7h1c3.5 0 5.5-2.5 5.5-6v-2"/></svg>Hand<kbd>H</kbd></button>
+        <button class="tool" data-tool="road" title="Draw road (R)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 21L10 3M17 21L14 3"/><path d="M12 6v2M12 11v2M12 16v2"/></svg>Road<kbd>R</kbd></button>
+        <button class="tool" data-tool="bridge" title="Draw flyover (F)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 9h20"/><path d="M2 9c3 0 4 3 4 6M22 9c-3 0-4 3-4 6"/><path d="M9 9v10M15 9v10"/></svg>Flyover<kbd>F</kbd></button>
+        <button class="tool" data-tool="delete" title="Delete (D)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>Delete<kbd>D</kbd></button>
+        <div class="undo-row"><button class="tool mini" id="undoBtn" title="Undo (Ctrl+Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>Undo</button><button class="tool mini" id="redoBtn" title="Redo (Ctrl+Shift+Z)" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg>Redo</button></div>
+      </nav>
+      <div id="drawOpts" hidden>
+        <div class="lbl">New road type</div>
+        <div class="chips" id="kindChips"></div>
+        <div class="row">
+          <select id="newLanes" class="ctl" aria-label="Lanes">
+            <option value="1">1 lane each way</option><option value="2">2 lanes each way</option><option value="3">3 lanes each way</option>
+            <option value="o1">One-way, 1 lane</option><option value="o2">One-way, 2 lanes</option><option value="o3">One-way, 3 lanes</option>
+          </select>
+          <select id="newSpeed" class="ctl" aria-label="Speed limit">
+            <option value="20">20 km/h</option><option value="30">30 km/h</option><option value="40">40 km/h</option><option value="50" selected>50 km/h</option><option value="60">60 km/h</option><option value="80">80 km/h</option><option value="100">100 km/h</option>
+          </select>
+        </div>
+        <select id="newKind" hidden><option value="highway">Highway</option><option value="arterial">Main road</option><option value="street" selected>Street</option><option value="service">Service road</option></select>
+      </div>
+      <div id="legend">
+        <button id="legendToggle">Map key</button>
+        <div id="legendBody" style="display:grid;gap:5px">
+          <div class="row"><span class="ramp"></span>flowing → slow → jammed</div>
+          <div class="row"><span class="lg-car"></span>red tail lights: car stopped</div>
+          <div class="row"><span class="lg-dot" style="background:var(--sig-green)"></span><span class="lg-dot" style="background:var(--sig-red)"></span>traffic signal state</div>
+          <div class="row"><span class="lg-dot" style="background:var(--accent)"></span>where cars enter and leave</div>
+        </div>
+      </div>
+      <div id="hint"></div>
+      <div id="tip" hidden></div>
+      <div id="toast" hidden></div>
+      <div id="coach" hidden><div class="card"><div class="step" id="coachStep"></div><h3 id="coachTitle"></h3><p id="coachText"></p><div class="btns"><button class="btn primary" id="coachNext">Next</button><button class="btn" id="coachSkip">Skip</button></div></div></div>
+    </div>
+
+    <aside id="panel">
+      <div id="tabs" role="tablist">
+        <button data-tab="results" class="on" role="tab">Results</button>
+        <button data-tab="edit" role="tab">Edit</button>
+        <button data-tab="data" role="tab">Map &amp; settings</button>
+      </div>
+
+      <section class="pane" id="pane-results">
+        <div class="status st-idle" id="status"><span class="pill"><i></i><span id="stLabel">Starting up</span></span><p id="stText">Cars are entering the map.</p><button class="linkbtn" id="stShow" hidden>Show me where</button></div>
+        <div class="tiles">
+          <div class="tile"><span class="k">Cars getting through</span><span class="v" id="mThr">0<small>/hour</small></span><span class="delta" id="dThr"></span></div>
+          <div class="tile"><span class="k">Time lost per trip</span><span class="v" id="mDelay">0<small>s</small></span><span class="delta" id="dDelay"></span></div>
+          <div class="tile"><span class="k">Average speed</span><span class="v" id="mSpeed">0<small>km/h</small></span><span class="delta" id="dSpeed"></span></div>
+          <div class="tile"><span class="k">Stuck at entry</span><span class="v" id="mWait">0<small>cars</small></span><span class="delta" id="dWait"></span></div>
+        </div>
+        <div class="small" id="mFoot">0 cars on the roads · 0 trips finished · averages over the last 5 minutes</div>
+        <div class="compare">
+          <h2>Before and after</h2>
+          <div class="small" id="baseInfo">Save the current numbers as "before", change something on the map, let it run 3 minutes, then compare.</div>
+          <div class="btns"><button class="btn primary" id="saveBase">Save as before</button><button class="btn" id="clearBase" hidden>Clear</button></div>
+        </div>
+        <div class="chart"><span class="t">Cars getting through, per hour</span><canvas id="chThr"></canvas><span class="ctip" id="tipThr" hidden></span></div>
+        <div class="chart"><span class="t">Time lost per trip, seconds</span><canvas id="chDelay"></canvas><span class="ctip" id="tipDelay" hidden></span></div>
+        <div class="warn small" id="gridlock" hidden></div>
+      </section>
+
+      <section class="pane" id="pane-edit" hidden>
+        <div id="inspector"></div>
+      </section>
+
+      <section class="pane" id="pane-data" hidden>
+        <div class="box">
+          <h3>Simulation</h3>
+          <label class="check"><input type="checkbox" id="heat" checked> Colour roads by congestion</label>
+          <label class="check"><input type="checkbox" id="smart" checked> Drivers re-route around jams</label>
+          <label class="check"><input type="checkbox" id="snap" checked> Snap new points to a 5 m grid</label>
+          <div class="row"><span class="small">Cars drive on the</span><select id="side" class="ctl"><option value="right">right</option><option value="left">left</option></select></div>
+          <div class="btns"><button class="btn" id="optimize" title="Retime every signal from the traffic measured so far (Webster's method)">Retime all signals</button><button class="btn" id="clearVeh">Remove all cars</button><button class="btn" id="resetM">Reset results</button></div>
+        </div>
+        <div class="box">
+          <h3>Real map (OpenStreetMap)</h3>
+          <p class="small" style="margin:0">Open <a href="https://overpass-turbo.eu/" target="_blank" rel="noopener">overpass-turbo.eu</a> (overpass-turbo.eu), zoom to an area about 1 km across, run the query below, then Export → raw OSM data, and upload or paste it here.</p>
+          <textarea id="ovq" readonly style="height:82px">[out:json][timeout:25];
+way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link|service)$"]({{bbox}});
+(._;>;);
+out body;</textarea>
+          <input type="file" id="osmFile" accept=".json,.osm,.xml,.txt">
+          <textarea id="osmBox" placeholder="…or paste Overpass JSON / OSM XML here"></textarea>
+          <div class="btns"><button class="btn" id="osmBtn">Import pasted map</button></div>
+        </div>
+        <div class="box">
+          <h3>Save or load this network</h3>
+          <div class="btns"><button class="btn" id="exportBtn">Show as text</button><button class="btn" id="copyBtn">Copy</button><button class="btn" id="importBtn">Load from text</button></div>
+          <textarea id="jsonBox" placeholder="Network text appears here. Paste one and press Load."></textarea>
+        </div>
+        <p class="small" style="margin:0">Keys: Ctrl+Z undo, Ctrl+Shift+Z redo, V select, H hand, arrow keys move the map (Shift for faster), + and − zoom, R road, F flyover, D delete, Space pause, Esc stop drawing, Del delete selection. Scroll to zoom, drag empty map to pan.</p>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Traffic Sandbox
+   - Model: nodes + roads (editable, serialisable, OSM-importable)
+   - Derived network: directed links with lanes, junction connectors
+   - Vehicles: Intelligent Driver Model car-following
+   - Control: fixed / actuated signals, all-way stop, priority (give way)
+   Units: metres, seconds. Screen y points down (north = -y).
+   ===================================================================== */
+
+const LW = 3.5;            // lane width (m)
+const DT = 0.1;            // sim step (s)
+const YELLOW = 3, ALLRED = 1.5;
+const SAT_FLOW = 1600;     // veh/h/lane, for signal optimisation
+const WINDOW = 300;        // metrics rolling window (s)
+
+// Road types: default lanes per direction, speed (km/h), priority rank, surface colour.
+const KINDS = {
+  highway:  { label: 'Highway',      lanes: 3, speed: 100, rank: 9, color: '#353b43' },
+  arterial: { label: 'Main road',    lanes: 2, speed: 60,  rank: 6, color: '#3b4149' },
+  street:   { label: 'Street',       lanes: 1, speed: 50,  rank: 3, color: '#3b4149' },
+  service:  { label: 'Service road', lanes: 1, speed: 30,  rank: 1, color: '#454a50' },
+};
+let uid = 1;
+const model = { nodes: new Map(), roads: new Map(), driveSide: 'right' };
+
+function addNode(x, y, extra) {
+  const n = Object.assign({ id: uid++, x, y, control: 'signal', green: 25, phaseGreens: null, demand: 300 }, extra || {});
+  model.nodes.set(n.id, n); return n;
+}
+function addRoad(a, b, lanesF = 1, lanesB = 1, speed = 50, extra) {
+  if (a === b) return null;
+  for (const r of model.roads.values()) if ((r.a === a && r.b === b) || (r.a === b && r.b === a)) return r;
+  const r = Object.assign({ id: uid++, a, b, lanesF, lanesB, speed, kind: (lanesF + lanesB >= 4 ? 'arterial' : 'street'), elevated: false }, extra || {});
+  model.roads.set(r.id, r); return r;
+}
+function clearModel() { model.nodes.clear(); model.roads.clear(); }
+function roadHalfWidth(r) { return (r.lanesF + r.lanesB) * LW / 2; }
+
+/* ---------------------------- derived network ---------------------------- */
+let net = { links: [], linkById: new Map(), info: new Map(), sources: [], sinks: [], conns: new Map(), dist: null, ffDist: null };
+let vehicles = [];
+let simTime = 0;
+
+function sidePerp(d) { // unit vector pointing to the driving side of a direction
+  const rx = -d.y, ry = d.x;        // right-hand side in screen coords (y down)
+  return model.driveSide === 'right' ? { x: rx, y: ry } : { x: -rx, y: -ry };
+}
+function compass(dx, dy) {
+  const a = Math.atan2(-dy, dx) * 180 / Math.PI; // 0 = east, 90 = north
+  const names = ['E', 'NE', 'N', 'NW', 'W', 'SW', 'S', 'SE'];
+  return names[((Math.round(a / 45) % 8) + 8) % 8];
+}
+
+function rebuild(keepVehicles = true) {
+  const oldInfo = net.info;
+  const old = keepVehicles ? vehicles : [];
+  const info = new Map();
+  for (const n of model.nodes.values())
+    info.set(n.id, { node: n, roads: [], inLinks: [], outLinks: [], setback: 0, phases: [], sig: null, stopQueue: [], occ: [], major: new Set(), pending: [], hw: 0, banSet: new Set(n.bans || []), phaseLinks: new Set() });
+  for (const r of model.roads.values()) {
+    if (!info.has(r.a) || !info.has(r.b)) { model.roads.delete(r.id); continue; }
+    info.get(r.a).roads.push(r); info.get(r.b).roads.push(r);
+  }
+  for (const ni of info.values()) {
+    ni.deg = ni.roads.length;
+    let hw = 0; for (const r of ni.roads) hw = Math.max(hw, roadHalfWidth(r));
+    ni.hw = hw;
+    ni.setback = ni.deg <= 1 ? 0 : hw + (ni.deg >= 3 ? 2.5 : 0.3);
+  }
+  const links = [], linkById = new Map();
+  for (const r of model.roads.values()) {
+    const A = model.nodes.get(r.a), B = model.nodes.get(r.b);
+    const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy);
+    if (L < 2) continue;
+    const d = { x: dx / L, y: dy / L };
+    const sbA = Math.min(info.get(r.a).setback, L * 0.4), sbB = Math.min(info.get(r.b).setback, L * 0.4);
+    const twoWay = r.lanesF > 0 && r.lanesB > 0;
+    const mk = (dirc, from, to, dd, n, sbFrom, sbTo) => {
+      if (n <= 0) return;
+      const len = L - sbFrom - sbTo;
+      const perp = sidePerp(dd);
+      const link = { i: links.length, id: r.id + ':' + dirc, road: r, dirc, from: from.id, to: to.id, d: dd, perp, len, n,
+        speed: r.speed / 3.6, lanes: [], sx: from.x + dd.x * sbFrom, sy: from.y + dd.y * sbFrom,
+        reverseId: r.id + ':' + (dirc === 'f' ? 'b' : 'f'), countIn: 0, tt: 0, ff: 0, spd: 1 };
+      for (let i = 0; i < n; i++) {
+        const off = twoWay ? (i + 0.5) * LW : (i + 0.5 - n / 2) * LW;
+        const sx = link.sx + perp.x * off, sy = link.sy + perp.y * off;
+        link.lanes.push({ link, idx: i, off, sx, sy, ex: sx + dd.x * len, ey: sy + dd.y * len, len, veh: [], lastEntered: null, reserved: 0 });
+      }
+      links.push(link); linkById.set(link.id, link);
+      info.get(from.id).outLinks.push(link); info.get(to.id).inLinks.push(link);
+    };
+    mk('f', A, B, d, r.lanesF, sbA, sbB);
+    mk('b', B, A, { x: -d.x, y: -d.y }, r.lanesB, sbB, sbA);
+  }
+  for (const l of links) {
+    const sbTo = info.get(l.to).setback;
+    l.ff = (l.len + 2 * sbTo) / l.speed; l.tt = l.ff;
+    const oldL = net.linkById.get(l.id); if (oldL) { l.tt = Math.max(l.ff, oldL.tt); l.spd = oldL.spd; }
+  }
+  // junction phases / priority
+  for (const ni of info.values()) {
+    if (ni.deg >= 3) {
+      // only approaches that still have somewhere to go get a signal phase
+      for (const l of ni.inLinks) if (ni.outLinks.some(m => m.id !== l.reverseId && !ni.banSet.has(l.road.id + '>' + m.road.id))) ni.phaseLinks.add(l);
+      const ins = [...ni.phaseLinks].sort((a, b) => Math.atan2(a.d.y, a.d.x) - Math.atan2(b.d.y, b.d.x));
+      const used = new Set();
+      for (const a of ins) {
+        if (used.has(a)) continue; used.add(a);
+        let best = null, bd = 0.7;
+        for (const b of ins) { if (used.has(b)) continue; const dot = -(a.d.x * b.d.x + a.d.y * b.d.y); if (dot > bd) { bd = dot; best = b; } }
+        const ph = [a]; if (best) { used.add(best); ph.push(best); }
+        ni.phases.push(ph);
+      }
+      const o = oldInfo.get(ni.node.id);
+      ni.sig = (o && o.sig && o.phases.length === ni.phases.length) ? o.sig : { phase: 0, stage: 'G', t: 0, cycle: 1 };
+      if (ni.sig.phase >= ni.phases.length) ni.sig.phase = 0;
+      // major roads for priority control: top two by rank
+      const rank = r => (r.rank != null ? r.rank : (KINDS[r.kind] || KINDS.street).rank) * 100 + (r.lanesF + r.lanesB) * 10 + r.speed / 10;
+      const sorted = ni.roads.slice().sort((a, b) => rank(b) - rank(a));
+      const majors = new Set(sorted.slice(0, 2).map(r => r.id));
+      for (const l of ni.inLinks) if (majors.has(l.road.id)) ni.major.add(l.id);
+    }
+    if (ni.deg === 1 && ni.outLinks.length) { const o = oldInfo.get(ni.node.id); if (o) ni.pending = o.pending; }
+  }
+  net = { links, linkById, info, conns: new Map(),
+    sources: [...info.values()].filter(ni => ni.deg === 1 && ni.outLinks.length),
+    sinks: [...info.values()].filter(ni => ni.deg === 1 && ni.inLinks.length), dist: null, ffDist: null };
+  net.ffDist = computeRouting(false);
+  net.dist = computeRouting(ui.smart);
+  // pending trips may now be invalid
+  for (const s of net.sources) s.pending = s.pending.filter(p => net.info.has(p.dest) && isFinite(distTo(net.ffDist, p.dest, s.outLinks[0])));
+  // restore vehicles
+  vehicles = [];
+  for (const v of old) {
+    if (!v.lane) continue; // vehicles inside a junction are dropped on edit
+    const l = linkById.get(v.link.id);
+    if (!l || !net.info.has(v.dest)) continue;
+    const lane = l.lanes[Math.min(v.lane.idx, l.n - 1)];
+    v.link = l; v.lane = lane; v.s = Math.min(v.s, l.len); v.conn = null; v.permit = null;
+    v.next = l.to === v.dest ? null : nextLink(v, l);
+    if (l.to !== v.dest && !v.next) continue;
+    lane.veh.push(v); vehicles.push(v);
+  }
+  for (const l of links) for (const ln of l.lanes) ln.veh.sort((a, b) => b.s - a.s);
+}
+
+/* ------------------------------ routing ------------------------------ */
+class Heap {
+  constructor() { this.a = []; }
+  push(k, v) { const a = this.a; a.push([k, v]); let i = a.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (a[p][0] <= a[i][0]) break; [a[p], a[i]] = [a[i], a[p]]; i = p; } }
+  pop() { const a = this.a, top = a[0], last = a.pop(); if (a.length) { a[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < a.length && a[l][0] < a[m][0]) m = l; if (r < a.length && a[r][0] < a[m][0]) m = r; if (m === i) break; [a[m], a[i]] = [a[i], a[m]]; i = m; } } return top; }
+  get size() { return this.a.length; }
+}
+// For each destination: cost-to-go from the start of every link (link-based so U-turns can be banned).
+function computeRouting(live) {
+  const table = new Map();
+  for (const sink of net.sinks) {
+    const dist = new Float64Array(net.links.length).fill(Infinity);
+    const h = new Heap();
+    for (const l of sink.inLinks) { const c = live ? l.tt : l.ff; dist[l.i] = c; h.push(c, l); }
+    while (h.size) {
+      const [d, L] = h.pop(); if (d > dist[L.i]) continue;
+      const via = net.info.get(L.from);
+      for (const P of via.inLinks) {
+        if (P.reverseId === L.id || via.banSet.has(P.road.id + '>' + L.road.id)) continue;
+        const nd = d + (live ? P.tt : P.ff);
+        if (nd < dist[P.i]) { dist[P.i] = nd; h.push(nd, P); }
+      }
+    }
+    table.set(sink.node.id, dist);
+  }
+  return table;
+}
+function distTo(table, dest, link) { const t = table && table.get(dest); return t ? t[link.i] : Infinity; }
+function nextLink(veh, link) {
+  const ni = net.info.get(link.to); let best = null, bc = Infinity;
+  const t = net.dist.get(veh.dest); if (!t) return null;
+  for (const M of ni.outLinks) {
+    if (M.id === link.reverseId && ni.deg > 1) continue;
+    if (ni.banSet.has(link.road.id + '>' + M.road.id)) continue;
+    const c = t[M.i] + (ui.smart ? M.lanes.reduce((s, ln) => s + ln.reserved, 0) * 0.5 : 0);
+    if (c < bc) { bc = c; best = M; }
+  }
+  return isFinite(bc) ? best : null;
+}
+
+/* --------------------------- junction connectors --------------------------- */
+function getConn(from, to) {
+  const key = from.link.id + '/' + from.idx + '>' + to.link.id + '/' + to.idx;
+  let c = net.conns.get(key);
+  if (c) return c;
+  const d1 = from.link.d, d2 = to.link.d;
+  const P0 = { x: from.ex, y: from.ey }, P3 = { x: to.sx, y: to.sy };
+  const k = Math.hypot(P3.x - P0.x, P3.y - P0.y) * 0.42;
+  const P1 = { x: P0.x + d1.x * k, y: P0.y + d1.y * k }, P2 = { x: P3.x - d2.x * k, y: P3.y - d2.y * k };
+  const N = 16, tab = [0]; let prev = P0, len = 0;
+  for (let i = 1; i <= N; i++) { const p = bez(P0, P1, P2, P3, i / N); len += Math.hypot(p.x - prev.x, p.y - prev.y); tab.push(len); prev = p; }
+  const dot = d1.x * d2.x + d1.y * d2.y;
+  const vmax = dot > 0.92 ? Math.min(from.link.speed, to.link.speed) : dot > -0.3 ? 7.5 : 4;
+  c = { key, from, to, node: net.info.get(from.link.to), P0, P1, P2, P3, tab, len: Math.max(len, 0.5), veh: [], vmax };
+  net.conns.set(key, c);
+  return c;
+}
+function bez(a, b, c, d, t) {
+  const u = 1 - t;
+  return { x: u * u * u * a.x + 3 * u * u * t * b.x + 3 * u * t * t * c.x + t * t * t * d.x,
+           y: u * u * u * a.y + 3 * u * u * t * b.y + 3 * u * t * t * c.y + t * t * t * d.y };
+}
+function connPoint(c, s) {
+  const tab = c.tab, N = tab.length - 1; s = Math.max(0, Math.min(s, tab[N]));
+  let i = 1; while (i < N && tab[i] < s) i++;
+  const t = (i - 1 + (s - tab[i - 1]) / Math.max(1e-6, tab[i] - tab[i - 1])) / N;
+  const p = bez(c.P0, c.P1, c.P2, c.P3, t), q = bez(c.P0, c.P1, c.P2, c.P3, Math.min(1, t + 0.02)), r = bez(c.P0, c.P1, c.P2, c.P3, Math.max(0, t - 0.02));
+  return { x: p.x, y: p.y, a: Math.atan2(q.y - r.y, q.x - r.x) };
+}
+
+/* ------------------------------- vehicles ------------------------------- */
+const PALETTE = ['#3d6fb6', '#b8473a', '#2f8f6b', '#6b5b95', '#d08a1f', '#55606b', '#1f7a8c', '#a34d6d', '#7a8b2f', '#2d4a73', '#e7e9ec', '#8a5a3c'];
+let vid = 1;
+function makeVehicle(src, trip) {
+  const truck = Math.random() < 0.07;
+  return { id: vid++, len: truck ? 11 : 4.5, w: truck ? 2.5 : 1.9, amax: truck ? 0.9 : 1.6, b: truck ? 2.0 : 2.6, T: truck ? 1.6 : 1.25, s0: 2,
+    vf: 0.9 + Math.random() * 0.2, color: truck ? '#e0a526' : PALETTE[(Math.random() * PALETTE.length) | 0],
+    dest: trip.dest, t0: trip.t0, ff: trip.ff, src: src.node.id, lane: null, link: null, s: 0, v: 0, a: 0, conn: null, next: null,
+    enterT: simTime, permit: null, yCycle: -1, yGo: false, noSpace: false };
+}
+function idm(veh, v0, gap, vl) {
+  const v = veh.v;
+  let a = veh.amax * (1 - Math.pow(v / Math.max(v0, 0.1), 4));
+  if (gap < 1e8) {
+    const ss = veh.s0 + Math.max(0, v * veh.T + v * (v - vl) / (2 * Math.sqrt(veh.amax * veh.b)));
+    const g = Math.max(gap, 0.05);
+    a -= veh.amax * (ss / g) * (ss / g);
+  }
+  return Math.max(a, -9);
+}
+function laneSpace(ln) {
+  const back = ln.veh[ln.veh.length - 1];
+  return (back ? back.s - back.len : ln.len) - ln.reserved * 7;
+}
+// Which lanes of `link` suit the vehicle's next turn: the near-side-most exit uses the curb lane,
+// the far-side-most exit uses the inside lane, anything else may use any lane.
+function laneOptions(link, veh) {
+  if (link.n < 2 || link.to === veh.dest) return link.lanes;
+  const after = nextLink(veh, link); if (!after) return link.lanes;
+  const ni = net.info.get(link.to);
+  const outs = ni.outLinks.filter(m => m.id !== link.reverseId && !ni.banSet.has(link.road.id + '>' + m.road.id));
+  if (outs.length < 2) return link.lanes;
+  const sgn = model.driveSide === 'right' ? 1 : -1;
+  const ang = m => sgn * Math.atan2(link.d.x * m.d.y - link.d.y * m.d.x, link.d.x * m.d.x + link.d.y * m.d.y);
+  let mx = -Infinity, mn = Infinity; for (const m of outs) { const a = ang(m); mx = Math.max(mx, a); mn = Math.min(mn, a); }
+  const a = ang(after);
+  if (a === mx && mx > 0.15) return [link.lanes[link.n - 1]];
+  if (a === mn && mn < -0.15) return [link.lanes[0]];
+  return link.lanes;
+}
+function pickOutLane(link, veh) {
+  let best = null, bs = -Infinity;
+  for (const ln of laneOptions(link, veh)) { const sp = laneSpace(ln); if (sp > bs) { bs = sp; best = ln; } }
+  return bs > veh.len + 2.5 ? best : null;
+}
+
+/* ------------------------------ control ------------------------------ */
+function controlOf(ni) { return ni.deg >= 3 ? ni.node.control : 'none'; }
+function greenFor(ni, p) { const g = ni.node.phaseGreens; return (g && g.length === ni.phases.length) ? g[p] : ni.node.green; }
+function signalState(ni, link) {
+  if (ni.phases.length < 2) return 'G';
+  const s = ni.sig; if (!ni.phases[s.phase].includes(link)) return 'R';
+  return s.stage === 'G' ? 'G' : s.stage === 'Y' ? 'Y' : 'R';
+}
+function phaseHasDemand(ni, p, range) {
+  for (const l of ni.phases[p]) for (const ln of l.lanes) { const f = ln.veh[0]; if (f && f.next && l.len - f.s < range) return true; }
+  return false;
+}
+function updateSignals() {
+  for (const ni of net.info.values()) {
+    const ctl = controlOf(ni);
+    if ((ctl !== 'signal' && ctl !== 'adaptive') || ni.phases.length < 2) continue;
+    const s = ni.sig, P = ni.phases.length; s.t += DT;
+    if (s.stage === 'G') {
+      const g = greenFor(ni, s.phase);
+      let end = s.t >= g;
+      if (ctl === 'adaptive') {
+        let other = false; for (let p = 0; p < P; p++) if (p !== s.phase && phaseHasDemand(ni, p, 60)) other = true;
+        const here = phaseHasDemand(ni, s.phase, 35);
+        if (!other) end = false;                       // rest in green
+        else if (s.t >= 6 && !here) end = true;        // gap-out
+        else end = s.t >= g;                           // max-out
+      }
+      if (end) { s.stage = 'Y'; s.t = 0; s.cycle++; }
+    } else if (s.stage === 'Y') {
+      if (s.t >= YELLOW) { s.stage = 'AR'; s.t = 0; }
+    } else if (s.t >= ALLRED) {
+      let nxt = (s.phase + 1) % P;
+      if (ctl === 'adaptive') for (let k = 1; k <= P; k++) { const p = (s.phase + k) % P; if (phaseHasDemand(ni, p, 60)) { nxt = p; break; } }
+      s.phase = nxt; s.stage = 'G'; s.t = 0;
+    }
+  }
+}
+function segCross(a, b, c, d) {
+  const o = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
+}
+// A minor-road vehicle yields only to major-road traffic whose path merges with or crosses its own.
+function gapForMinor(ni, link, veh, toLane) {
+  const a0 = { x: veh.lane.ex, y: veh.lane.ey }, a1 = { x: toLane.sx, y: toLane.sy };
+  // 0 = no conflict, 1 = merge into the same lane (short gap accepted), 2 = paths cross
+  const conflicts = (fromLane, nextLink, toL) => {
+    if (nextLink === toLane.link) return (!toL || toL === toLane || nextLink.n === 1) ? 1 : 0;
+    const b1 = toL || nextLink.lanes[0];
+    return segCross(a0, a1, { x: fromLane.ex, y: fromLane.ey }, { x: b1.sx, y: b1.sy }) ? 2 : 0;
+  };
+  for (const o of ni.occ) if (o.conn && ni.major.has(o.conn.from.link.id) && conflicts(o.conn.from, o.conn.to.link, o.conn.to) === 2) return false;
+  for (const M of ni.inLinks) {
+    if (M === link || !ni.major.has(M.id)) continue;
+    for (const ln of M.lanes) {
+      const f = ln.veh[0]; if (!f || !f.next) continue;
+      const d = M.len - f.s;
+      if (d > 70) continue;
+      const c = conflicts(ln, f.next, f.permit);
+      if (c && d / Math.max(f.v, 0.5) < (c === 1 ? 2.5 : 4.5)) return false;
+    }
+  }
+  return true;
+}
+// Returns the lane to enter on the next link, or null if the vehicle must wait at the stop line.
+function entryPermit(veh) {
+  const link = veh.link, ni = net.info.get(link.to);
+  const toLane = pickOutLane(veh.next, veh);
+  veh.noSpace = !toLane;
+  const ctl = controlOf(ni), dist = link.len - veh.s;
+  if (ctl === 'stop') {
+    if (!ni.stopQueue.includes(veh)) { if (dist < 4.5 && veh.v < 0.6) ni.stopQueue.push(veh); return null; }
+    if (!toLane) return null;
+    for (const q of ni.stopQueue) { if (q === veh) break; if (!q.noSpace) return null; }
+    if (ni.occ.some(o => o.conn && o.conn.from.link !== link)) return null;
+    return toLane;
+  }
+  if (!toLane) return null;
+  if (ctl === 'signal' || ctl === 'adaptive') {
+    const st = signalState(ni, link);
+    if (st === 'G') return toLane;
+    if (st === 'Y') {
+      if (veh.yCycle !== ni.sig.cycle) { veh.yCycle = ni.sig.cycle; veh.yGo = dist < veh.v * veh.v / (2 * 3.2) + 1; }
+      return veh.yGo ? toLane : null;
+    }
+    return null;
+  }
+  if (ctl === 'priority' && !ni.major.has(link.id)) return gapForMinor(ni, link, veh, toLane) ? toLane : null;
+  return toLane;
+}
+
+/* ------------------------------ sim step ------------------------------ */
+const ui = { running: true, speed: 1, demand: 1, heat: false, smart: true, snap: true, tool: 'select' };
+let trips = [];          // {t, tt, delay}
+let metricsStart = 0, completed = 0, lost = 0;
+let history = [];
+let lastRoute = 0, lastSample = 0, lastSpd = 0;
+
+function spawn() {
+  for (const src of net.sources) {
+    const rate = src.node.demand * ui.demand / 3600;
+    if (rate > 0 && Math.random() < rate * DT && src.pending.length < 300) {
+      const out = src.outLinks[0];
+      const cands = net.sinks.filter(s => s !== src && isFinite(distTo(net.ffDist, s.node.id, out)));
+      if (cands.length) {
+        const tot = cands.reduce((a, s) => a + Math.max(1, s.node.demand), 0);
+        let r = Math.random() * tot, dest = cands[0];
+        for (const s of cands) { r -= Math.max(1, s.node.demand); if (r <= 0) { dest = s; break; } }
+        src.pending.push({ dest: dest.node.id, t0: simTime, ff: distTo(net.ffDist, dest.node.id, out) });
+      }
+    }
+    if (src.pending.length) {
+      const out = src.outLinks[0];
+      let best = null, bs = -Infinity;
+      for (const ln of laneOptions(out, { dest: src.pending[0].dest })) { const sp = laneSpace(ln); if (sp > bs) { bs = sp; best = ln; } }
+      if (bs > 16) {
+        const trip = src.pending.shift();
+        const v = makeVehicle(src, trip);
+        const back = best.veh[best.veh.length - 1];
+        v.link = out; v.lane = best; v.s = 0; v.v = back ? Math.min(out.speed * 0.8, back.v) : out.speed * 0.8; v.enterT = simTime;
+        v.next = out.to === v.dest ? null : nextLink(v, out);
+        best.veh.push(v); vehicles.push(v);
+      }
+    }
+  }
+}
+
+function step() {
+  simTime += DT;
+  updateSignals();
+  spawn();
+  // accelerations
+  for (const l of net.links) {
+    for (const ln of l.lanes) {
+      const arr = ln.veh;
+      for (let i = 0; i < arr.length; i++) {
+        const veh = arr[i];
+        let v0 = l.speed * veh.vf;
+        if (i > 0) { const ld = arr[i - 1]; veh.a = idm(veh, v0, ld.s - ld.len - veh.s, ld.v); continue; }
+        const distEnd = l.len - veh.s;
+        veh.permit = null;
+        if (!veh.next) { veh.a = idm(veh, v0, 1e9, 0); continue; }
+        if (distEnd > 150) { veh.a = idm(veh, v0, 1e9, 0); continue; }
+        const toLane = entryPermit(veh);
+        veh.permit = toLane;
+        if (!toLane) { veh.a = idm(veh, v0, distEnd - 0.5, 0); continue; }
+        const conn = getConn(ln, toLane);
+        v0 = Math.min(v0, Math.sqrt(conn.vmax * conn.vmax + 2 * 1.4 * Math.max(0, distEnd)));
+        let gap = 1e9, vl = 0;
+        const le = ln.lastEntered;
+        if (le && le.conn && le.conn.from === ln) { gap = distEnd + le.s - le.len; vl = le.v; }
+        else { const back = toLane.veh[toLane.veh.length - 1]; if (back) { gap = distEnd + conn.len + back.s - back.len; vl = back.v; } }
+        veh.a = idm(veh, v0, gap, vl);
+      }
+    }
+  }
+  for (const c of net.conns.values()) {
+    const arr = c.veh;
+    for (let i = 0; i < arr.length; i++) {
+      const veh = arr[i], v0 = c.vmax * veh.vf;
+      if (i > 0) { const ld = arr[i - 1]; veh.a = idm(veh, v0, ld.s - ld.len - veh.s, ld.v); continue; }
+      const back = c.to.veh[c.to.veh.length - 1];
+      veh.a = back ? idm(veh, v0, c.len - veh.s + back.s - back.len, back.v) : idm(veh, v0, 1e9, 0);
+    }
+  }
+  // integrate
+  for (const veh of vehicles) {
+    const nv = veh.v + veh.a * DT;
+    if (nv < 0) { veh.s += veh.a < 0 ? -veh.v * veh.v / (2 * veh.a) : 0; veh.v = 0; }
+    else { veh.s += veh.v * DT + 0.5 * veh.a * DT * DT; veh.v = nv; }
+  }
+  // transitions: lane -> junction / exit
+  const gone = new Set();
+  for (const l of net.links) {
+    const ni = net.info.get(l.to);
+    for (const ln of l.lanes) {
+      while (ln.veh.length && ln.veh[0].s >= ln.len) {
+        const veh = ln.veh[0];
+        if (!veh.next) {
+          if (l.to === veh.dest) {
+            ln.veh.shift(); gone.add(veh); completed++;
+            const tt = simTime - veh.t0; trips.push({ t: simTime, tt, delay: Math.max(0, tt - veh.ff) });
+          } else { ln.veh.shift(); gone.add(veh); lost++; }
+          continue;
+        }
+        const toLane = veh.permit;
+        if (!toLane || !net.linkById.has(toLane.link.id)) { veh.s = ln.len; veh.v = 0; break; }
+        ln.veh.shift();
+        const obs = simTime - veh.enterT; l.tt = 0.85 * l.tt + 0.15 * Math.max(l.ff, obs);
+        l.countIn++;
+        const conn = getConn(ln, toLane);
+        ln.lastEntered = veh; toLane.reserved++;
+        veh.s -= ln.len; veh.lane = null; veh.conn = conn; conn.veh.push(veh); ni.occ.push(veh);
+        const qi = ni.stopQueue.indexOf(veh); if (qi >= 0) ni.stopQueue.splice(qi, 1);
+      }
+    }
+  }
+  // transitions: junction -> next link
+  for (const c of net.conns.values()) {
+    while (c.veh.length && c.veh[0].s >= c.len) {
+      const veh = c.veh.shift(); const to = c.to, L = to.link;
+      to.reserved = Math.max(0, to.reserved - 1);
+      const oi = c.node.occ.indexOf(veh); if (oi >= 0) c.node.occ.splice(oi, 1);
+      veh.conn = null; veh.lane = to; veh.link = L; veh.s -= c.len; veh.enterT = simTime;
+      const back = to.veh[to.veh.length - 1];
+      if (back && veh.s > back.s - back.len - 0.5) veh.s = Math.max(0, back.s - back.len - 0.5);
+      to.veh.push(veh);
+      veh.next = L.to === veh.dest ? null : nextLink(veh, L);
+      if (!veh.next && L.to !== veh.dest) { to.veh.pop(); gone.add(veh); lost++; }
+    }
+  }
+  if (gone.size) vehicles = vehicles.filter(v => !gone.has(v));
+  // link speed EMA for heatmap, every second
+  if (simTime - lastSpd >= 1) {
+    lastSpd = simTime;
+    for (const l of net.links) {
+      // congestion = share of the road taken up by stopped or crawling cars
+      let n = 0, stopLen = 0;
+      for (const ln of l.lanes) for (const v of ln.veh) { n++; if (v.v < 2) stopLen += v.len + 2; }
+      const r = Math.max(0, 1 - 1.6 * stopLen / Math.max(1, l.len * l.n));
+      l.spd = 0.8 * l.spd + 0.2 * r;
+      if (!n) l.tt = 0.97 * l.tt + 0.03 * l.ff; // empty links recover
+    }
+  }
+  if (ui.smart && simTime - lastRoute > 15) { lastRoute = simTime; net.dist = computeRouting(true); }
+  if (simTime - lastSample >= 10) { lastSample = simTime; history.push({ t: simTime, ...currentMetrics() }); if (history.length > 400) history.shift(); }
+}
+
+function currentMetrics() {
+  const from = Math.max(metricsStart, simTime - WINDOW);
+  while (trips.length && trips[0].t < simTime - WINDOW - 5) trips.shift();
+  const rec = trips.filter(t => t.t >= from);
+  const span = Math.max(1, simTime - from);
+  const thr = rec.length / span * 3600;
+  const delay = rec.length ? rec.reduce((a, t) => a + t.delay, 0) / rec.length : 0;
+  const trip = rec.length ? rec.reduce((a, t) => a + t.tt, 0) / rec.length : 0;
+  let sv = 0; for (const v of vehicles) sv += v.v;
+  const speed = vehicles.length ? sv / vehicles.length * 3.6 : 0;
+  let wait = 0; for (const s of net.sources) wait += s.pending.length;
+  return { thr, delay, trip, speed, veh: vehicles.length, wait, n: rec.length, span: simTime - metricsStart };
+}
+function resetMetrics() {
+  trips = []; metricsStart = simTime; history = []; lastSample = simTime;
+  for (const l of net.links) l.countIn = 0;
+}
+
+/* ------------------------------ optimisation ------------------------------ */
+function optimizeSignals() {
+  const T = simTime - metricsStart;
+  if (T < 120) { toast('Let the simulation run at least 2 minutes after the last change, then optimize.'); return; }
+  let n = 0; const notes = [];
+  for (const ni of net.info.values()) {
+    const ctl = controlOf(ni);
+    if ((ctl !== 'signal' && ctl !== 'adaptive') || ni.phases.length < 2) continue;
+    const P = ni.phases.length, lostT = P * (YELLOW + ALLRED + 2);
+    const ys = ni.phases.map(ph => Math.max(0.02, ...ph.map(l => (l.countIn / T * 3600) / (SAT_FLOW * l.n))));
+    let Y = ys.reduce((a, b) => a + b, 0); const Yc = Math.min(Y, 0.9);
+    const C = Math.max(60, Math.min(150, (1.5 * lostT + 5) / (1 - Yc)));
+    ni.node.phaseGreens = ys.map(y => Math.max(7, Math.round((C - lostT) * y / Y)));
+    n++; if (n <= 3) notes.push('#' + ni.node.id + ': ' + ni.node.phaseGreens.join('/') + ' s');
+  }
+  if (!n) { toast('No signalized junctions to optimize.'); return; }
+  afterEdit(false);
+  toast('Retimed ' + n + ' signal' + (n > 1 ? 's' : '') + ' with Webster\'s method (' + notes.join(', ') + (n > 3 ? ', …' : '') + '). Metrics reset; run a few minutes to compare.');
+}
+
+/* ------------------------------ presets ------------------------------ */
+function loadPreset(name) {
+  clearModel(); vehicles = []; simTime = 0; lastRoute = 0; lastSpd = 0; net.info = new Map(); net.linkById = new Map();
+  const N = (x, y, e) => addNode(x, y, e), R = (a, b, lf, lb, sp) => addRoad(a.id, b.id, lf, lb, sp, { kind: sp >= 80 ? 'highway' : lf >= 2 ? 'arterial' : 'street' });
+  if (name === 'busy') {
+    const c = N(0, 0), w = N(-420, 0, { demand: 1100 }), e = N(420, 0, { demand: 1100 }), n = N(0, -320, { demand: 450 }), s = N(0, 320, { demand: 450 });
+    R(w, c, 2, 2, 60); R(c, e, 2, 2, 60); R(n, c, 1, 1, 40); R(c, s, 1, 1, 40);
+  } else if (name === 'single') {
+    const c = N(0, 0), w = N(-320, 0, { demand: 650 }), e = N(320, 0, { demand: 650 }), n = N(0, -320, { demand: 300 }), s = N(0, 320, { demand: 300 });
+    c.green = 25; R(w, c, 2, 2, 60); R(c, e, 2, 2, 60); R(n, c, 1, 1, 40); R(c, s, 1, 1, 40);
+  } else if (name === 'grid') {
+    const sp = 220, g = [];
+    for (let i = 0; i < 3; i++) { g.push([]); for (let j = 0; j < 3; j++) g[i].push(N((j - 1) * sp, (i - 1) * sp, { green: 20 })); }
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { if (j < 2) R(g[i][j], g[i][j + 1], 1, 1, 50); if (i < 2) R(g[i][j], g[i + 1][j], 1, 1, 50); }
+    const arm = 200, dem = 220;
+    for (let k = 0; k < 3; k++) {
+      R(N((k - 1) * sp, -sp - arm, { demand: dem }), g[0][k], 1, 1, 50); R(g[2][k], N((k - 1) * sp, sp + arm, { demand: dem }), 1, 1, 50);
+      R(N(-sp - arm, (k - 1) * sp, { demand: dem }), g[k][0], 1, 1, 50); R(g[k][2], N(sp + arm, (k - 1) * sp, { demand: dem }), 1, 1, 50);
+    }
+  } else if (name === 'arterial') {
+    const xs = [-450, -150, 150, 450];
+    const W = N(-750, 0, { demand: 900 }), E = N(750, 0, { demand: 900 });
+    let prev = W;
+    for (const x of xs) {
+      const j = N(x, 0, { green: 30 });
+      R(prev, j, 2, 2, 60); prev = j;
+      R(N(x, -260, { demand: 220 }), j, 1, 1, 40); R(j, N(x, 260, { demand: 220 }), 1, 1, 40);
+    }
+    R(prev, E, 2, 2, 60);
+  } else if (name === 'bottleneck') {
+    const W = N(-700, 0, { demand: 1500 }), a = N(-250, 0), b = N(150, 0), c = N(450, 0, { control: 'priority' }), E = N(800, 0, { demand: 300 });
+    R(W, a, 3, 3, 80); R(a, b, 3, 3, 80); R(b, c, 1, 1, 60); R(c, E, 1, 1, 60);
+    R(N(450, -250, { demand: 250 }), c, 1, 1, 40);
+  }
+  rebuild(false);
+  resetMetrics(); completed = 0; lost = 0;
+  fitView(); select(null); resetHistory();
+}
+
+/* ------------------------------ import / export ------------------------------ */
+function exportJSON() {
+  return JSON.stringify({ format: 'traffic-sandbox', version: 1, driveSide: model.driveSide,
+    nodes: [...model.nodes.values()].map(n => ({ id: n.id, x: +n.x.toFixed(2), y: +n.y.toFixed(2), control: n.control, green: n.green, phaseGreens: n.phaseGreens || undefined, demand: n.demand, osm: n.osm, elevated: n.elevated || undefined, bans: (n.bans && n.bans.length) ? n.bans : undefined })),
+    roads: [...model.roads.values()].map(r => ({ id: r.id, a: r.a, b: r.b, lanesF: r.lanesF, lanesB: r.lanesB, speed: r.speed, name: r.name, rank: r.rank, kind: r.kind, elevated: r.elevated || undefined })) });
+}
+// Accepts our own format. Nodes may carry lat/lon instead of x/y; they are projected to local metres.
+function importJSON(text) {
+  const d = JSON.parse(text);
+  if (d.elements) return importOSM(d);
+  if (!d.nodes || !d.roads) throw new Error('Expected {nodes:[...], roads:[...]}');
+  clearModel(); vehicles = []; net.info = new Map(); net.linkById = new Map();
+  if (d.driveSide) { model.driveSide = d.driveSide; document.getElementById('side').value = d.driveSide; }
+  const proj = makeProjection(d.nodes.filter(n => n.lat != null));
+  const idMap = new Map(), roadIdMap = new Map();
+  for (const n of d.nodes) {
+    let x = n.x, y = n.y; if (n.lat != null) [x, y] = proj(n.lat, n.lon);
+    const nn = addNode(x, y, { control: n.control || 'signal', green: n.green || 25, phaseGreens: n.phaseGreens || null, demand: n.demand != null ? n.demand : 300, osm: n.osm, elevated: !!n.elevated, bans: n.bans || null });
+    idMap.set(n.id, nn.id);
+  }
+  for (const r of d.roads) {
+    const a = idMap.get(r.a), b = idMap.get(r.b); if (a == null || b == null) continue;
+    let lf = r.lanesF, lb = r.lanesB; if (r.oneway) { lf = lf || 1; lb = 0; }
+    const nr = addRoad(a, b, lf != null ? lf : 1, lb != null ? lb : 1, r.speed || 50, { name: r.name, rank: r.rank, elevated: !!r.elevated });
+    if (nr && r.kind) nr.kind = r.kind;
+    if (nr) roadIdMap.set(r.id, nr.id);
+  }
+  for (const n of model.nodes.values()) if (n.bans) n.bans = n.bans.map(k => k.split('>').map(x => roadIdMap.get(+x) ?? roadIdMap.get(x) ?? x).join('>'));
+  finishImport();
+}
+function makeProjection(pts) {
+  if (!pts.length) return () => [0, 0];
+  const lat0 = pts.reduce((a, p) => a + p.lat, 0) / pts.length, lon0 = pts.reduce((a, p) => a + p.lon, 0) / pts.length;
+  const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
+  return (lat, lon) => [(lon - lon0) * kx, -(lat - lat0) * ky];
+}
+const HW_CLASS = { motorway: [100, 2, 9], trunk: [80, 2, 8], primary: [60, 1, 7], secondary: [50, 1, 6], tertiary: [40, 1, 5],
+  unclassified: [30, 1, 3], residential: [30, 1, 2], living_street: [20, 1, 1], service: [20, 1, 1] };
+function osmClass(h) { if (!h) return null; const base = h.replace('_link', ''); const c = HW_CLASS[base]; if (!c) return null; return h.endsWith('_link') ? [Math.min(c[0], 50), 1, c[2] - 0.5] : c; }
+function parseOSMXML(text) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  const tags = el => { const t = {}; el.querySelectorAll(':scope > tag').forEach(g => t[g.getAttribute('k')] = g.getAttribute('v')); return t; };
+  const elements = [];
+  doc.querySelectorAll('node').forEach(n => elements.push({ type: 'node', id: +n.getAttribute('id'), lat: +n.getAttribute('lat'), lon: +n.getAttribute('lon'), tags: tags(n) }));
+  doc.querySelectorAll('way').forEach(w => elements.push({ type: 'way', id: +w.getAttribute('id'), nodes: [...w.querySelectorAll(':scope > nd')].map(n => +n.getAttribute('ref')), tags: tags(w) }));
+  if (!elements.length) throw new Error('No OSM nodes or ways found');
+  return { elements };
+}
+function importOSM(data) {
+  const onodes = new Map(), ways = [];
+  for (const e of data.elements) {
+    if (e.type === 'node') onodes.set(e.id, e);
+    else if (e.type === 'way' && e.tags && osmClass(e.tags.highway) && e.tags.area !== 'yes' && e.tags.access !== 'private') ways.push(e);
+  }
+  if (!ways.length) throw new Error('No drivable roads (highway=*) found in that data');
+  const use = new Map();
+  for (const w of ways) w.nodes.forEach((id, i) => use.set(id, (use.get(id) || 0) + ((i === 0 || i === w.nodes.length - 1) ? 1 : 2)));
+  const proj = makeProjection([...use.keys()].map(id => onodes.get(id)).filter(Boolean));
+  clearModel(); vehicles = []; net.info = new Map(); net.linkById = new Map();
+  const nodeFor = new Map();
+  const getNode = (oid) => {
+    if (nodeFor.has(oid)) return nodeFor.get(oid);
+    const o = onodes.get(oid); const [x, y] = proj(o.lat, o.lon);
+    const t = (o.tags && o.tags.highway) || '';
+    const control = t === 'traffic_signals' ? 'signal' : (t === 'stop' || t === 'all_way_stop') ? 'stop' : 'priority';
+    const n = addNode(x, y, { control, green: 25, demand: 150, osm: oid }); nodeFor.set(oid, n); return n;
+  };
+  // A signal tagged on a node just before a junction should control that junction.
+  const signalNear = new Set();
+  for (const w of ways) {
+    const cls = osmClass(w.tags.highway);
+    const base = w.tags.highway.replace('_link', '');
+    const kind = /motorway|trunk/.test(base) ? 'highway' : /primary|secondary/.test(base) ? 'arterial' : /service|living_street/.test(base) ? 'service' : 'street';
+    const elevated = w.tags.bridge && w.tags.bridge !== 'no' || parseInt(w.tags.layer, 10) > 0;
+    let speed = cls[0];
+    const ms = w.tags.maxspeed; if (ms) { const v = parseFloat(ms); if (!isNaN(v)) speed = /mph/.test(ms) ? Math.round(v * 1.609) : v; }
+    const oneway = w.tags.oneway === 'yes' || w.tags.oneway === '1' || w.tags.oneway === '-1' || w.tags.junction === 'roundabout' || w.tags.highway === 'motorway';
+    const rev = w.tags.oneway === '-1';
+    let lanes = parseInt(w.tags.lanes, 10);
+    let lf, lb;
+    if (oneway) { lf = Math.max(1, Math.min(4, isNaN(lanes) ? cls[1] : lanes)); lb = 0; }
+    else {
+      const f = parseInt(w.tags['lanes:forward'], 10), b = parseInt(w.tags['lanes:backward'], 10);
+      if (!isNaN(f) && !isNaN(b)) { lf = f; lb = b; }
+      else if (!isNaN(lanes)) { lf = Math.max(1, Math.ceil(lanes / 2)); lb = Math.max(1, Math.floor(lanes / 2)); }
+      else { lf = lb = cls[1]; }
+      lf = Math.min(lf, 4); lb = Math.min(lb, 4);
+    }
+    const ids = w.nodes.filter(id => onodes.has(id));
+    // split at junctions; simplify each piece
+    let piece = [ids[0]];
+    const flush = () => {
+      if (piece.length < 2) return;
+      const pts = piece.map(id => { const o = onodes.get(id); const [x, y] = proj(o.lat, o.lon); return { id, x, y }; });
+      const keep = simplify(pts, 6, 15);
+      for (let i = 1; i < keep.length; i++) {
+        const a = getNode(keep[i - 1].id), b = getNode(keep[i].id);
+        const ex = { name: w.tags.name, rank: cls[2], kind, elevated: !!elevated };
+        if (rev) addRoad(b.id, a.id, lf, lb, speed, ex);
+        else addRoad(a.id, b.id, lf, lb, speed, ex);
+      }
+    };
+    for (let i = 1; i < ids.length; i++) {
+      piece.push(ids[i]);
+      const o = onodes.get(ids[i]);
+      if (o.tags && o.tags.highway === 'traffic_signals' && use.get(ids[i]) < 3) signalNear.add(ids[i]);
+      if (use.get(ids[i]) >= 3 || i === ids.length - 1) { flush(); piece = [ids[i]]; }
+    }
+  }
+  addEdgeGates();
+  finishImport();
+  // move stray signal tags onto the nearest junction within 40 m
+  for (const oid of signalNear) {
+    const o = onodes.get(oid); const [x, y] = proj(o.lat, o.lon); let best = null, bd = 40;
+    for (const ni of net.info.values()) if (ni.deg >= 3) { const d = Math.hypot(ni.node.x - x, ni.node.y - y); if (d < bd) { bd = d; best = ni; } }
+    if (best) best.node.control = 'signal';
+  }
+  rebuild(false); resetMetrics();
+  toast('Imported ' + ways.length + ' OSM ways as ' + model.roads.size + ' road segments and ' + net.sources.length + ' entry points. Dead ends and map edges act as entries/exits.');
+}
+// If the map has (almost) no dead ends, add short entry/exit stubs at nodes on the map edge.
+function addEdgeGates() {
+  const deg = new Map(); for (const r of model.roads.values()) { deg.set(r.a, (deg.get(r.a) || 0) + 1); deg.set(r.b, (deg.get(r.b) || 0) + 1); }
+  const nodes = [...model.nodes.values()].filter(n => deg.get(n.id));
+  if (nodes.filter(n => deg.get(n.id) === 1).length >= 2 || nodes.length < 3) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of nodes) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); }
+  const tol = Math.max(15, 0.04 * Math.max(x1 - x0, y1 - y0));
+  for (const n of nodes) {
+    const dx = n.x - x0 < tol ? -1 : x1 - n.x < tol ? 1 : 0, dy = n.y - y0 < tol ? -1 : y1 - n.y < tol ? 1 : 0;
+    if (!dx && !dy) continue;
+    const L = Math.hypot(dx, dy), g = addNode(n.x + dx / L * 60, n.y + dy / L * 60, { demand: 150 });
+    addRoad(n.id, g.id, 1, 1, 40);
+  }
+}
+// keep endpoints; drop interior points within tol of the chord and points closer than minSeg
+function simplify(pts, tol, minSeg) {
+  if (pts.length <= 2) return pts;
+  const keep = new Array(pts.length).fill(false); keep[0] = keep[pts.length - 1] = true;
+  const rec = (i, j) => {
+    let md = 0, mi = -1; const a = pts[i], b = pts[j]; const L = Math.hypot(b.x - a.x, b.y - a.y) || 1e-9;
+    for (let k = i + 1; k < j; k++) { const d = Math.abs((b.x - a.x) * (a.y - pts[k].y) - (a.x - pts[k].x) * (b.y - a.y)) / L; if (d > md) { md = d; mi = k; } }
+    if (md > tol) { keep[mi] = true; rec(i, mi); rec(mi, j); }
+  };
+  rec(0, pts.length - 1);
+  const out = []; for (let i = 0; i < pts.length; i++) if (keep[i]) out.push(pts[i]);
+  const res = [out[0]];
+  for (let i = 1; i < out.length - 1; i++) { const p = res[res.length - 1]; if (Math.hypot(out[i].x - p.x, out[i].y - p.y) >= minSeg) res.push(out[i]); }
+  const last = out[out.length - 1], pl = res[res.length - 1];
+  if (res.length > 1 && Math.hypot(last.x - pl.x, last.y - pl.y) < minSeg) res.pop();
+  res.push(last);
+  return res;
+}
+function finishImport() {
+  // remove isolated nodes
+  const deg = new Map(); for (const r of model.roads.values()) { deg.set(r.a, (deg.get(r.a) || 0) + 1); deg.set(r.b, (deg.get(r.b) || 0) + 1); }
+  for (const id of [...model.nodes.keys()]) if (!deg.get(id)) model.nodes.delete(id);
+  for (const n of model.nodes.values()) uid = Math.max(uid, n.id + 1);
+  for (const r of model.roads.values()) uid = Math.max(uid, r.id + 1);
+  rebuild(false); resetMetrics(); completed = 0; lost = 0; fitView(); select(null); resetHistory();
+}
+
+/* ------------------------------ editing ------------------------------ */
+function afterEdit(structural = true) {
+  rebuild(true);
+  resetMetrics();
+  renderInspector();
+  commitHistory();
+}
+/* ---------- undo / redo: whole-network snapshots taken after every edit ---------- */
+const undoStack = [], redoStack = [];
+let lastSnap = null;
+function snapModel() { return JSON.stringify({ nodes: [...model.nodes.values()], roads: [...model.roads.values()] }); }
+function commitHistory() {
+  const cur = snapModel();
+  if (lastSnap != null && cur !== lastSnap) { undoStack.push(lastSnap); if (undoStack.length > 100) undoStack.shift(); redoStack.length = 0; }
+  lastSnap = cur; updateUndoButtons();
+}
+function resetHistory() { undoStack.length = 0; redoStack.length = 0; lastSnap = snapModel(); updateUndoButtons(); }
+function restoreSnap(json) {
+  const d = JSON.parse(json);
+  model.nodes.clear(); model.roads.clear();
+  for (const n of d.nodes) { model.nodes.set(n.id, n); uid = Math.max(uid, n.id + 1); }
+  for (const r of d.roads) { model.roads.set(r.id, r); uid = Math.max(uid, r.id + 1); }
+  drawFrom = null;
+  rebuild(true); resetMetrics();
+  lastSnap = json; renderInspector(); updateUndoButtons();
+}
+function undo() {
+  if (drawFrom != null) endDraw();
+  commitHistory();
+  if (!undoStack.length) { toast('Nothing to undo.'); return; }
+  redoStack.push(lastSnap); restoreSnap(undoStack.pop()); toast('Undone.');
+}
+function redo() {
+  if (!redoStack.length) { toast('Nothing to redo.'); return; }
+  undoStack.push(lastSnap); restoreSnap(redoStack.pop()); toast('Redone.');
+}
+function updateUndoButtons() {
+  const u = document.getElementById('undoBtn'), r = document.getElementById('redoBtn');
+  if (u) u.disabled = !undoStack.length; if (r) r.disabled = !redoStack.length;
+}
+function removeIsolated() {
+  const deg = new Map(); for (const r of model.roads.values()) { deg.set(r.a, 1); deg.set(r.b, 1); }
+  for (const id of [...model.nodes.keys()]) if (!deg.has(id)) model.nodes.delete(id);
+}
+function deleteNode(id) {
+  for (const r of [...model.roads.values()]) if (r.a === id || r.b === id) model.roads.delete(r.id);
+  model.nodes.delete(id); removeIsolated();
+}
+function deleteRoad(id) { model.roads.delete(id); removeIsolated(); }
+function splitRoad(r, x, y) {
+  const n = addNode(x, y, r.elevated ? { elevated: true, control: 'none' } : undefined);
+  const r2 = Object.assign({}, r, { id: uid++, a: n.id, b: r.b });
+  const nb = model.nodes.get(r.b);
+  if (nb && nb.bans) nb.bans = nb.bans.map(k => k.split('>').map(x => +x === r.id ? r2.id : x).join('>'));
+  r.b = n.id; model.roads.set(r2.id, r2);
+  return n;
+}
+/* ---------- junction geometry helpers ---------- */
+function otherEnd(r, nodeId) { return model.nodes.get(r.a === nodeId ? r.b : r.a); }
+function armDir(r, node) { const o = otherEnd(r, node.id); const dx = o.x - node.x, dy = o.y - node.y, L = Math.hypot(dx, dy) || 1; return { x: dx / L, y: dy / L }; }
+function armsOf(nodeId) {
+  const node = model.nodes.get(nodeId);
+  return [...model.roads.values()].filter(r => r.a === nodeId || r.b === nodeId).map(r => {
+    const d = armDir(r, node), atB = r.b === nodeId;
+    const canIn = atB ? r.lanesF > 0 : r.lanesB > 0, canOut = atB ? r.lanesB > 0 : r.lanesF > 0;
+    let name = compass(d.x, d.y); if (r.kind === 'service') name += ' svc'; if (r.elevated) name += ' fly';
+    return { road: r, d, name, canIn, canOut };
+  });
+}
+function oppositePairs(arms) {
+  const out = [], ok = a => a.canIn && a.canOut && a.road.kind !== 'service' && !a.road.elevated;
+  for (let i = 0; i < arms.length; i++) for (let j = i + 1; j < arms.length; j++)
+    if (ok(arms[i]) && ok(arms[j]) && arms[i].d.x * arms[j].d.x + arms[i].d.y * arms[j].d.y < -0.8) out.push([arms[i], arms[j]]);
+  return out;
+}
+// movement from arm a (arriving) to arm b (leaving): 'straight' | 'near' (turn without crossing traffic) | 'far' | 'uturn'
+function movementType(a, b) {
+  if (a === b) return 'uturn';
+  const din = { x: -a.d.x, y: -a.d.y }, dout = b.d;
+  const dot = din.x * dout.x + din.y * dout.y; if (dot > 0.7) return 'straight';
+  const cross = din.x * dout.y - din.y * dout.x;  // > 0 means a right turn on screen
+  const right = cross > 0;
+  return (right === (model.driveSide === 'right')) ? 'near' : 'far';
+}
+function setMovementRule(nodeId, rule, pair) {
+  const node = model.nodes.get(nodeId), arms = armsOf(nodeId), bans = [];
+  const onAxis = a => pair && (a.road.id === pair[0].road.id || a.road.id === pair[1].road.id);
+  for (const a of arms) for (const b of arms) {
+    if (a === b) continue;
+    const t = movementType(a, b);
+    let ok = true;
+    if (rule === 'axisOnly') ok = onAxis(a) && onAxis(b);
+    else if (rule === 'median') ok = t === 'near' || (t === 'straight' && onAxis(a));
+    else if (rule === 'noFar') ok = t !== 'far';
+    else if (rule === 'noCross') ok = !(onAxis(a) && onAxis(b) && t === 'straight');
+    if (!ok) bans.push(a.road.id + '>' + b.road.id);
+  }
+  node.bans = bans;
+}
+function toggleMovement(nodeId, from, to) {
+  const node = model.nodes.get(nodeId); const k = from + '>' + to;
+  const set = new Set(node.bans || []); set.has(k) ? set.delete(k) : set.add(k); node.bans = [...set];
+}
+// Turn a crossroads into a flyover along one axis, with one-way service roads beneath for turning traffic.
+function makeFlyover(nodeId, pair) {
+  const G = model.nodes.get(nodeId);
+  for (const arm of pair) if (Math.hypot(otherEnd(arm.road, G.id).x - G.x, otherEnd(arm.road, G.id).y - G.y) < 90) { toast('The ' + arm.name + ' road is too short for ramps (needs 90 m).'); return false; }
+  const B = addNode(G.x, G.y, { elevated: true, control: 'none' });
+  for (const arm of pair) {
+    const r = arm.road, O = otherEnd(r, G.id);
+    const L = Math.hypot(O.x - G.x, O.y - G.y), ramp = Math.min(L * 0.6, 130);
+    const P = splitRoad(r, G.x + arm.d.x * ramp, G.y + arm.d.y * ramp);
+    P.control = 'priority';
+    const inner = [...model.roads.values()].find(x => (x.a === P.id && x.b === G.id) || (x.b === P.id && x.a === G.id));
+    if (inner.a === G.id) inner.a = B.id; else inner.b = B.id;
+    inner.elevated = true;
+    // service roads either side: traffic heading to the junction keeps to the driving side
+    const u = { x: -arm.d.x, y: -arm.d.y };                     // from P towards G
+    const side = sidePerp(u);
+    const off = roadHalfWidth(r) + LW * 1.5 + 2;
+    const mid = (k) => addNode(P.x + (G.x - P.x) * 0.5 + side.x * off * k, P.y + (G.y - P.y) * 0.5 + side.y * off * k, { control: 'none' });
+    const q1 = mid(1), q2 = mid(-1);
+    const lanes = Math.min(2, Math.max(r.lanesF, r.lanesB, 1));
+    const svc = { kind: 'service' };
+    addRoad(P.id, q1.id, lanes, 0, 30, svc); addRoad(q1.id, G.id, lanes, 0, 30, svc);
+    addRoad(G.id, q2.id, lanes, 0, 30, svc); addRoad(q2.id, P.id, lanes, 0, 30, svc);
+  }
+  G.bans = []; G.phaseGreens = null;
+  return true;
+}
+// Parallel two-way service road on the driving side, joined to the road by slip junctions near each end.
+// Service roads beside a road, joined to it by give-way slip roads near each end.
+// both = false: one two-way service road on the driving side.
+// both = true: a one-way service road on each side, running the same way as the traffic next to it.
+function addServiceRoad(roadId, both) {
+  const r = model.roads.get(roadId), A = model.nodes.get(r.a), B = model.nodes.get(r.b);
+  const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy);
+  if (L < 140) { toast('This road piece is only ' + Math.round(L) + ' m long; a service road needs 140 m. Select a longer piece.'); return false; }
+  const d = { x: dx / L, y: dy / L }, side = sidePerp(d), off = roadHalfWidth(r) + 9, inset = Math.min(40, L * 0.15);
+  const Pa = splitRoad(r, A.x + d.x * inset, A.y + d.y * inset);
+  const r2 = [...model.roads.values()].find(x => x.a === Pa.id && x.b === B.id);
+  const Pb = splitRoad(r2, B.x - d.x * inset, B.y - d.y * inset);
+  Pa.control = Pb.control = 'priority';
+  const svc = { kind: 'service' };
+  const build = (k, oneway) => {
+    const a2 = addNode(Pa.x + d.x * 25 + side.x * off * k, Pa.y + d.y * 25 + side.y * off * k, { control: 'priority' });
+    const b2 = addNode(Pb.x - d.x * 25 + side.x * off * k, Pb.y - d.y * 25 + side.y * off * k, { control: 'priority' });
+    if (!oneway) { addRoad(Pa.id, a2.id, 1, 1, 30, svc); addRoad(a2.id, b2.id, 1, 1, 30, svc); addRoad(b2.id, Pb.id, 1, 1, 30, svc); }
+    else if (k > 0) { addRoad(Pa.id, a2.id, 1, 0, 30, svc); addRoad(a2.id, b2.id, 1, 0, 30, svc); addRoad(b2.id, Pb.id, 1, 0, 30, svc); }
+    else { addRoad(Pb.id, b2.id, 1, 0, 30, svc); addRoad(b2.id, a2.id, 1, 0, 30, svc); addRoad(a2.id, Pa.id, 1, 0, 30, svc); }
+  };
+  if (both) { build(1, true); build(-1, true); } else build(1, false);
+  return true;
+}
+function adoptRoadSpec(r) {
+  const lanes = Math.max(r.lanesF, r.lanesB), oneway = !(r.lanesF && r.lanesB);
+  $('newLanes').value = (oneway ? 'o' : '') + Math.min(3, Math.max(1, lanes));
+  const sp = [20, 30, 40, 50, 60, 80, 100].reduce((a, b) => Math.abs(b - r.speed) < Math.abs(a - r.speed) ? b : a);
+  $('newSpeed').value = String(sp);
+  $('newKind').value = r.kind || 'street';
+  document.querySelectorAll('#kindChips .chip').forEach(c => c.classList.toggle('on', c.dataset.kind === $('newKind').value));
+}
+function newRoadSpec() {
+  return newRoadSpecRaw();
+}
+function newRoadExtra() { return { kind: document.getElementById('newKind').value, elevated: ui.tool === 'bridge' }; }
+function newRoadSpecRaw() {
+  const v = document.getElementById('newLanes').value, sp = +document.getElementById('newSpeed').value;
+  if (v[0] === 'o') return [+v[1], 0, sp];
+  return [+v, +v, sp];
+}
+
+
+/* ------------------------------ view / input ------------------------------ */
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+const cam = { x: 0, y: 0, z: 1.2 };
+function resize() {
+  const r = cv.getBoundingClientRect(); DPR = window.devicePixelRatio || 1;
+  W = r.width; H = r.height; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+}
+window.addEventListener('resize', resize);
+const w2s = (x, y) => [(x - cam.x) * cam.z + W / 2, (y - cam.y) * cam.z + H / 2];
+const s2w = (x, y) => [(x - W / 2) / cam.z + cam.x, (y - H / 2) / cam.z + cam.y];
+function fitView() {
+  if (!model.nodes.size) { cam.x = 0; cam.y = 0; cam.z = 1.2; return; }
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of model.nodes.values()) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); }
+  const padL = W > 600 ? 110 : 30, padT = W > 600 ? 70 : 90;
+  cam.z = Math.max(0.05, Math.min(4, Math.min((W - padL - 60) / Math.max(50, x1 - x0), (H - padT - 50) / Math.max(50, y1 - y0))));
+  cam.x = (x0 + x1) / 2 - (padL - 30) / 2 / cam.z; cam.y = (y0 + y1) / 2 - (padT - 50) / 2 / cam.z;
+}
+
+let selection = null;   // {type:'node'|'road', id}
+let hover = null;
+let drawFrom = null;    // node id while drawing
+let mouseW = [0, 0], mouseS = [0, 0];
+let drag = null;
+
+function nodeAt(sx, sy) {
+  let best = null, bd = 12;
+  for (const n of model.nodes.values()) { const [x, y] = w2s(n.x, n.y); const d = Math.hypot(x - sx, y - sy) + (n.elevated && ui.tool !== 'bridge' ? 4 : 0); if (d < bd) { bd = d; best = n; } }
+  return best;
+}
+function roadAt(wx, wy, level) {
+  let best = null, bd = Infinity, bp = null;
+  for (const r of model.roads.values()) {
+    if (level != null && !!r.elevated !== level) continue;
+    const A = model.nodes.get(r.a), B = model.nodes.get(r.b);
+    const dx = B.x - A.x, dy = B.y - A.y, L2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((wx - A.x) * dx + (wy - A.y) * dy) / L2));
+    const px = A.x + dx * t, py = A.y + dy * t, d = Math.hypot(wx - px, wy - py);
+    const score = d - (r.elevated ? 3 : 0);
+    if (d < roadHalfWidth(r) + 6 / cam.z && score < bd) { bd = score; best = r; bp = { x: px, y: py, t }; }
+  }
+  return best ? { road: best, p: bp } : null;
+}
+function snapW(x, y) { return ui.snap ? [Math.round(x / 5) * 5, Math.round(y / 5) * 5] : [x, y]; }
+function select(sel) { selection = sel; renderInspector(); }
+
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const [wx, wy] = s2w(e.offsetX, e.offsetY);
+  cam.z = Math.max(0.03, Math.min(12, cam.z * Math.exp(-e.deltaY * 0.0015)));
+  const [nx, ny] = s2w(e.offsetX, e.offsetY); cam.x += wx - nx; cam.y += wy - ny;
+}, { passive: false });
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  const sx = e.offsetX, sy = e.offsetY; const [wx, wy] = s2w(sx, sy);
+  if (e.button === 1 || e.button === 2 || spaceDown) {
+    if (e.button === 2 && (ui.tool === 'road' || ui.tool === 'bridge') && drawFrom != null) { endDraw(); return; }
+    drag = { kind: 'pan', sx, sy, cx: cam.x, cy: cam.y }; return;
+  }
+  if (ui.tool === 'pan') { drag = { kind: 'pan', sx, sy, cx: cam.x, cy: cam.y }; cv.classList.add('grabbing'); return; }
+  if (ui.tool === 'select') {
+    const n = nodeAt(sx, sy);
+    if (n) { select({ type: 'node', id: n.id }); drag = { kind: 'node', id: n.id, moved: false }; return; }
+    const r = roadAt(wx, wy);
+    if (r) { select({ type: 'road', id: r.road.id }); return; }
+    select(null); drag = { kind: 'pan', sx, sy, cx: cam.x, cy: cam.y };
+  } else if (ui.tool === 'delete') {
+    const n = nodeAt(sx, sy);
+    if (n) { deleteNode(n.id); if (selection && selection.id === n.id) selection = null; afterEdit(); return; }
+    const r = roadAt(wx, wy);
+    if (r) { deleteRoad(r.road.id); if (selection && selection.id === r.road.id) selection = null; afterEdit(); return; }
+    drag = { kind: 'pan', sx, sy, cx: cam.x, cy: cam.y };
+  } else if (ui.tool === 'road' || ui.tool === 'bridge') {
+    const bridge = ui.tool === 'bridge';
+    let n = nodeAt(sx, sy);
+    if (!n) {
+      // a flyover passes over ground roads instead of joining them; it only joins other flyovers
+      // clicked points snap onto existing roads (a flyover end on a ground road becomes a ramp junction);
+      // the stretch between clicks passes over whatever it crosses without joining it
+      const r = roadAt(wx, wy);
+      if (r && r.p.t > 0.02 && r.p.t < 0.98) {
+        n = splitRoad(r.road, r.p.x, r.p.y);
+        if (bridge && !r.road.elevated) n.control = 'priority';
+        if (bridge && drawFrom == null) adoptRoadSpec(r.road);   // a flyover starting on a road copies its size
+      }
+      else { const [x, y] = snapW(wx, wy); n = addNode(x, y, bridge ? { elevated: true, control: 'none' } : undefined); }
+    }
+    if (drawFrom != null && drawFrom !== n.id) {
+      const A = model.nodes.get(drawFrom);
+      if (Math.hypot(A.x - n.x, A.y - n.y) < 12) { toast('Road too short (min 12 m).'); return; }
+      const [lf, lb, sp] = newRoadSpec(); addRoad(drawFrom, n.id, lf, lb, sp, newRoadExtra());
+      afterEdit();
+    }
+    drawFrom = n.id;
+  }
+});
+cv.addEventListener('pointermove', e => {
+  mouseS = [e.offsetX, e.offsetY]; mouseW = s2w(e.offsetX, e.offsetY);
+  if (drag && drag.kind === 'pan') { cam.x = drag.cx - (e.offsetX - drag.sx) / cam.z; cam.y = drag.cy - (e.offsetY - drag.sy) / cam.z; return; }
+  if (drag && drag.kind === 'node') {
+    const n = model.nodes.get(drag.id); if (!n) return;
+    const [x, y] = snapW(mouseW[0], mouseW[1]); if (x !== n.x || y !== n.y) { n.x = x; n.y = y; drag.moved = true; rebuild(true); }
+    return;
+  }
+  const n = nodeAt(e.offsetX, e.offsetY);
+  hover = n ? { type: 'node', id: n.id } : (() => { const r = roadAt(mouseW[0], mouseW[1]); return r ? { type: 'road', id: r.road.id } : null; })();
+});
+cv.addEventListener('pointerup', () => { if (drag && drag.kind === 'node' && drag.moved) afterEdit(); drag = null; cv.classList.remove('grabbing'); });
+function endDraw() {
+  if (drawFrom != null) { const ni = [...model.roads.values()].some(r => r.a === drawFrom || r.b === drawFrom); if (!ni) model.nodes.delete(drawFrom); }
+  drawFrom = null; rebuild(true);
+}
+let spaceDown = false;
+window.addEventListener('keydown', e => {
+  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
+  if (e.code === 'Space') { e.preventDefault(); if (!spaceDown) togglePlay(); spaceDown = true; }
+  else if (e.key === 'Escape') { endDraw(); }
+  else if (e.key === 'v' || e.key === 'V') setTool('select');
+  else if (e.key === 'r' || e.key === 'R') setTool('road');
+  else if (e.key === 'd' || e.key === 'D') setTool('delete');
+  else if (e.key === 'f' || e.key === 'F') setTool('bridge');
+  else if (e.key === 'h' || e.key === 'H') setTool('pan');
+  else if (e.key.startsWith('Arrow')) { e.preventDefault(); arrowKeys.add(e.key); arrowFast = e.shiftKey; }
+  else if (e.key === '+' || e.key === '=') zoomBy(1.25);
+  else if (e.key === '-' || e.key === '_') zoomBy(0.8);
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && selection) {
+    if (selection.type === 'node') deleteNode(selection.id); else deleteRoad(selection.id);
+    selection = null; afterEdit();
+  }
+});
+window.addEventListener('keyup', e => { if (e.code === 'Space') spaceDown = false; arrowKeys.delete(e.key); arrowFast = e.shiftKey; });
+window.addEventListener('blur', () => arrowKeys.clear());
+// arrow keys pan the map smoothly while held
+const arrowKeys = new Set(); let arrowFast = false;
+function panByKeys(dt) {
+  if (!arrowKeys.size) return;
+  const v = (arrowFast ? 1500 : 600) * dt / cam.z;
+  if (arrowKeys.has('ArrowLeft')) cam.x -= v; if (arrowKeys.has('ArrowRight')) cam.x += v;
+  if (arrowKeys.has('ArrowUp')) cam.y -= v; if (arrowKeys.has('ArrowDown')) cam.y += v;
+}
+function zoomBy(f) { cam.z = Math.max(0.03, Math.min(12, cam.z * f)); }
+
+function setTool(t) {
+  if ((ui.tool === 'road' || ui.tool === 'bridge') && t !== ui.tool) endDraw();
+  ui.tool = t;
+  document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
+  updateHint();
+}
+document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+function updateHint() {
+  const h = { select: 'Hover for live numbers. Click a road or junction to edit it. Drag empty map to pan, scroll to zoom.',
+    road: 'Click point to point to draw. Click on a road to join it with a junction. Press Esc or right-click to finish.',
+    bridge: 'Click on a road to start the ramp, click on a road beyond the crossing to land it. It passes over anything in between. Esc to finish.',
+    delete: 'Click a road or junction to delete it. Press V to go back to selecting.',
+    pan: 'Drag to move the map. Arrow keys work with any tool; hold Shift to go faster.' };
+  document.getElementById('hint').textContent = h[ui.tool];
+}
+
+
+
+/* ------------------------------ theme ------------------------------ */
+let T = {};
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement), g = k => cs.getPropertyValue('--' + k).trim();
+  T = {};
+  for (const k of ['paper', 'paper-grid', 'block', 'road', 'road-edge', 'road-service', 'road-hwy', 'hwy-edge', 'mark', 'center', 'bridge', 'bridge-edge', 'shadow',
+    'ink', 'ink-2', 'muted', 'surface', 'surface-2', 'line', 'accent', 'accent-ink', 'good', 'warn', 'serious', 'critical', 'sig-green', 'sig-amber', 'sig-red', 'sig-body', 'sel'])
+    T[k] = g(k);
+}
+readTheme();
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readTheme); } catch (e) {}
+new MutationObserver(readTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+/* ------------------------------ rendering ------------------------------ */
+function hexToRgb(h) { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); const n = parseInt(h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function lerpColor(r) { // 0 = jammed, 1 = free
+  r = Math.max(0, Math.min(1, r));
+  const a = hexToRgb(T.critical || '#c42b2b'), b = hexToRgb(T.warn || '#c98a0b'), c = hexToRgb(T.good || '#1f8a52');
+  const [c0, c1, f] = r < 0.5 ? [a, b, r / 0.5] : [b, c, (r - 0.5) / 0.5];
+  return 'rgb(' + c0.map((v, k) => Math.round(v + (c1[k] - v) * f)).join(',') + ')';
+}
+const isElevLink = l => !!l.road.elevated;
+function vehElevated(v) {
+  if (v.lane) return isElevLink(v.lane.link);
+  if (v.conn) return isElevLink(v.conn.from.link) && isElevLink(v.conn.to.link);
+  return false;
+}
+function roadFill(r, elev) { if (elev) return T.bridge; return r.kind === 'highway' ? T['road-hwy'] : r.kind === 'service' ? T['road-service'] : T.road; }
+function roadEdge(r, elev) { if (elev) return T['bridge-edge']; return r.kind === 'highway' ? T['hwy-edge'] : T['road-edge']; }
+function strokeSeg(A, B, color, width) { ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke(); }
+function vehPose(v) {
+  if (v.lane) { const ln = v.lane, d = ln.link.d; const s = v.s - v.len / 2; return { x: ln.sx + d.x * s, y: ln.sy + d.y * s, a: Math.atan2(d.y, d.x) }; }
+  if (v.conn) return connPoint(v.conn, v.s - v.len / 2);
+  return null;
+}
+function roundRect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function drawVehicle(v, px) {
+  const p = vehPose(v); if (!p) return;
+  ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.a);
+  const zoomedOut = cam.z < 0.9;
+  const L = Math.max(v.len, (zoomedOut ? 4 : 3) * px), Wd = Math.max(v.w, (zoomedOut ? 2.6 : 1.6) * px);
+  const stopped = v.v < 1;
+  if (zoomedOut) {
+    ctx.fillStyle = stopped ? T['sig-red'] : v.color; ctx.fillRect(-L / 2, -Wd / 2, L, Wd);
+  } else {
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; roundRect(-L / 2 + 0.25, -Wd / 2 + 0.35, L, Wd, 0.7); ctx.fill();
+    ctx.fillStyle = v.color; roundRect(-L / 2, -Wd / 2, L, Wd, 0.7); ctx.fill();
+    ctx.fillStyle = 'rgba(25,35,45,0.55)';
+    if (v.len > 6) ctx.fillRect(L / 2 - 2.2, -Wd / 2 + 0.25, 1.6, Wd - 0.5);         // truck cab window
+    else { ctx.fillRect(L / 2 - 1.75, -Wd / 2 + 0.25, 0.85, Wd - 0.5); ctx.fillRect(-L / 2 + 0.55, -Wd / 2 + 0.3, 0.6, Wd - 0.6); }
+    ctx.fillStyle = stopped ? T['sig-red'] : 'rgba(120,20,20,0.55)';
+    ctx.fillRect(-L / 2 - 0.05, -Wd / 2 + 0.15, stopped ? 0.45 : 0.25, 0.5); ctx.fillRect(-L / 2 - 0.05, Wd / 2 - 0.65, stopped ? 0.45 : 0.25, 0.5);
+    if (stopped && cam.z > 1.6) { ctx.fillStyle = 'rgba(224,48,47,0.25)'; ctx.beginPath(); ctx.arc(-L / 2 - 0.4, 0, Wd * 0.75, 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.restore();
+}
+function drawLayer(elev, px) {
+  const roads = [...model.roads.values()].filter(r => !!r.elevated === elev);
+  const nodes = [...net.info.values()].filter(ni => ni.deg >= 2 && !!ni.node.elevated === elev);
+  const discR = ni => Math.max(ni.deg >= 3 ? ni.setback : ni.hw + 0.4, 1.5 * px);
+  if (elev) {
+    for (const r of roads) { const A = model.nodes.get(r.a), B = model.nodes.get(r.b); strokeSeg({ x: A.x + 2.5, y: A.y + 4 }, { x: B.x + 2.5, y: B.y + 4 }, T.shadow, roadHalfWidth(r) * 2 + 3); }
+    // pillars
+    if (cam.z > 0.5) for (const r of roads) {
+      const A = model.nodes.get(r.a), B = model.nodes.get(r.b), L = Math.hypot(B.x - A.x, B.y - A.y);
+      ctx.fillStyle = T['bridge-edge'];
+      for (let s = 20; s < L - 10; s += 30) { const t = s / L; ctx.beginPath(); ctx.arc(A.x + (B.x - A.x) * t + 1.5, A.y + (B.y - A.y) * t + 2.5, 1.4, 0, Math.PI * 2); ctx.fill(); }
+    }
+  }
+  // curbs, then surfaces (so junctions merge cleanly)
+  for (const r of roads) { const A = model.nodes.get(r.a), B = model.nodes.get(r.b); strokeSeg(A, B, roadEdge(r, elev), Math.max(roadHalfWidth(r) * 2 + (elev ? 1.8 : 1.4), 3 * px)); }
+  for (const ni of nodes) { ctx.fillStyle = elev ? T['bridge-edge'] : T['road-edge']; ctx.beginPath(); ctx.arc(ni.node.x, ni.node.y, discR(ni) + 0.7, 0, Math.PI * 2); ctx.fill(); }
+  for (const r of roads) {
+    const A = model.nodes.get(r.a), B = model.nodes.get(r.b);
+    const sel = selection && selection.type === 'road' && selection.id === r.id, hov = hover && hover.type === 'road' && hover.id === r.id;
+    strokeSeg(A, B, roadFill(r, elev), Math.max(roadHalfWidth(r) * 2, 2 * px));
+    if (sel || hov) { ctx.globalAlpha = sel ? 0.9 : 0.45; strokeSeg(A, B, T.sel, Math.max(1.2, 2.5 * px)); ctx.globalAlpha = 1; }
+  }
+  for (const ni of nodes) { ctx.fillStyle = elev ? T.bridge : T.road; ctx.beginPath(); ctx.arc(ni.node.x, ni.node.y, discR(ni), 0, Math.PI * 2); ctx.fill(); }
+  const links = net.links.filter(l => isElevLink(l) === elev);
+  // congestion tint: only where traffic is actually slow, so problems stand out
+  if (ui.heat) {
+    for (const l of links) {
+      if (l.spd > 0.85) continue;
+      ctx.globalAlpha = Math.min(0.75, 0.25 + (0.85 - l.spd) * 0.8);
+      ctx.strokeStyle = lerpColor(l.spd); ctx.lineWidth = Math.max(l.n * LW - 0.6, 2.5 * px);
+      const off = (l.lanes[0].off + l.lanes[l.n - 1].off) / 2;
+      const sx = l.sx + l.perp.x * off, sy = l.sy + l.perp.y * off;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + l.d.x * l.len, sy + l.d.y * l.len); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  if (cam.z > 0.45) {
+    for (const l of links) {
+      const r = l.road; const twoWay = r.lanesF > 0 && r.lanesB > 0;
+      if (twoWay && l.dirc === 'f') {
+        const svc = r.kind === 'service';
+        ctx.strokeStyle = svc ? T.mark : T.center; ctx.lineWidth = svc ? 0.2 : 0.3; ctx.setLineDash(svc ? [2, 4] : []);
+        ctx.beginPath(); ctx.moveTo(l.sx, l.sy); ctx.lineTo(l.sx + l.d.x * l.len, l.sy + l.d.y * l.len); ctx.stroke();
+      }
+      ctx.strokeStyle = T.mark; ctx.lineWidth = 0.2; ctx.setLineDash([3, 6]);
+      for (let i = 1; i < l.n; i++) {
+        const off = l.lanes[i].off - LW / 2;
+        const sx = l.sx + l.perp.x * off, sy = l.sy + l.perp.y * off;
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + l.d.x * l.len, sy + l.d.y * l.len); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+  }
+  // stop lines
+  for (const ni of net.info.values()) {
+    if (ni.deg < 3) continue;
+    const ctl = ni.node.control;
+    for (const l of ni.inLinks) {
+      if (isElevLink(l) !== elev) continue;
+      let col = null, dash = null;
+      if (!ni.phaseLinks.has(l)) { col = T.muted; dash = [0.6, 0.6]; }
+      else if (ctl === 'signal' || ctl === 'adaptive') { const st = signalState(ni, l); col = st === 'G' ? T['sig-green'] : st === 'Y' ? T['sig-amber'] : T['sig-red']; }
+      else if (ctl === 'stop') col = T.ink;
+      else if (ctl === 'priority' && !ni.major.has(l.id)) { col = T.ink; dash = [0.8, 0.8]; }
+      if (!col) continue;
+      const ex = l.sx + l.d.x * l.len, ey = l.sy + l.d.y * l.len;
+      const o0 = l.lanes[0].off - LW / 2, o1 = l.lanes[l.n - 1].off + LW / 2;
+      ctx.strokeStyle = col; ctx.lineWidth = Math.max(0.5, 2 * px); if (dash) ctx.setLineDash(dash);
+      ctx.beginPath(); ctx.moveTo(ex + l.perp.x * o0, ey + l.perp.y * o0); ctx.lineTo(ex + l.perp.x * o1, ey + l.perp.y * o1); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  for (const v of vehicles) if (vehElevated(v) === elev) drawVehicle(v, px);
+}
+
+// queue length (stopped cars near the end) on an approach
+function queueOn(l) {
+  let q = 0;
+  for (const ln of l.lanes) for (const v of ln.veh) if (v.v < 1.5 && l.len - v.s < 250) q++;
+  return q;
+}
+function pill(x, y, text, bg, fg, opts = {}) {
+  ctx.font = (opts.bold ? '700 ' : '600 ') + (opts.size || 11) + 'px ' + 'Overpass, system-ui, sans-serif';
+  const w = ctx.measureText(text).width + 12, h = (opts.size || 11) + 8;
+  ctx.fillStyle = bg; roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.fill();
+  if (opts.border) { ctx.strokeStyle = opts.border; ctx.lineWidth = 1; ctx.stroke(); }
+  ctx.fillStyle = fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y + 1);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+}
+function signalHead(sx, sy, state, secs) {
+  // small three-lamp head drawn in screen space
+  const w = 10, h = 26;
+  ctx.fillStyle = T['sig-body']; roundRect(sx - w / 2, sy - h / 2, w, h, 3); ctx.fill();
+  const lamps = [['R', T['sig-red']], ['Y', T['sig-amber']], ['G', T['sig-green']]];
+  lamps.forEach(([k, c], i) => { ctx.fillStyle = state === k ? c : 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.arc(sx, sy - 8 + i * 8, 2.8, 0, Math.PI * 2); ctx.fill(); });
+  if (secs != null && cam.z > 1.1) { ctx.font = '700 10px Overpass Mono, monospace'; ctx.fillStyle = T.ink; ctx.textAlign = 'center'; ctx.fillText(String(secs), sx, sy + h / 2 + 10); ctx.textAlign = 'left'; }
+}
+function drawOverlays() {
+  // signal heads beside each signalised approach
+  if (cam.z > 0.55) for (const ni of net.info.values()) {
+    if (ni.deg < 3 || ni.node.elevated) continue;
+    const ctl = ni.node.control; if (ctl !== 'signal' && ctl !== 'adaptive') continue;
+    for (const l of ni.inLinks) {
+      if (!ni.phaseLinks.has(l)) continue;
+      const st = signalState(ni, l);
+      const off = l.lanes[l.n - 1].off + LW / 2 + 2.2;   // curb side
+      const wx = l.sx + l.d.x * (l.len - 1.5) + l.perp.x * off, wy = l.sy + l.d.y * (l.len - 1.5) + l.perp.y * off;
+      const [sx, sy] = w2s(wx, wy);
+      let secs = null; const s = ni.sig;
+      if (st === 'G' && ctl === 'signal') secs = Math.max(0, Math.ceil(greenFor(ni, s.phase) - s.t));
+      signalHead(sx, sy, st, secs);
+    }
+  }
+  // queue bubbles
+  if (cam.z > 0.18) for (const ni of net.info.values()) {
+    if (ni.deg < 2) continue;
+    for (const l of ni.inLinks) {
+      const q = queueOn(l); if (q < 4) continue;
+      const back = Math.min(l.len - 4, (q / l.n) * 6.5 + 8);
+      const off = (l.lanes[0].off + l.lanes[l.n - 1].off) / 2;
+      const wx = l.sx + l.d.x * (l.len - back) + l.perp.x * off, wy = l.sy + l.d.y * (l.len - back) + l.perp.y * off;
+      const [sx, sy] = w2s(wx, wy);
+      const sev = q >= 20 ? T.critical : q >= 9 ? T.serious : T.warn;
+      pill(sx, sy - 14, q + ' waiting', sev, '#fff', { bold: true });
+    }
+  }
+  // entry / exit points
+  for (const ni of net.info.values()) {
+    if (ni.deg !== 1) continue;
+    const [sx, sy] = w2s(ni.node.x, ni.node.y);
+    ctx.fillStyle = T.accent; ctx.beginPath(); ctx.arc(sx, sy, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = T.surface; ctx.lineWidth = 2; ctx.stroke();
+    if (cam.z > 0.15 && ni.outLinks.length) {
+      const d = ni.outLinks[0].d; const lx = sx - d.x * 22, ly = sy - d.y * 22;
+      const waiting = ni.pending.length;
+      pill(lx, ly, Math.round(ni.node.demand * ui.demand) + ' cars/h' + (waiting > 5 ? '  +' + waiting + ' stuck' : ''), waiting > 5 ? T.critical : T.surface, waiting > 5 ? '#fff' : T['ink-2'], { border: waiting > 5 ? null : T.line });
+    }
+  }
+}
+function draw() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = T.paper; ctx.fillRect(0, 0, W, H);
+  const step = cam.z > 1.5 ? 10 : cam.z > 0.4 ? 50 : 250;
+  const [gx0, gy0] = s2w(0, 0), [gx1, gy1] = s2w(W, H);
+  ctx.strokeStyle = T['paper-grid']; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = Math.floor(gx0 / step) * step; x < gx1; x += step) { const [sx] = w2s(x, 0); ctx.moveTo(sx, 0); ctx.lineTo(sx, H); }
+  for (let y = Math.floor(gy0 / step) * step; y < gy1; y += step) { const [, sy] = w2s(0, y); ctx.moveTo(0, sy); ctx.lineTo(W, sy); }
+  ctx.stroke();
+
+  ctx.save();
+  ctx.translate(W / 2, H / 2); ctx.scale(cam.z, cam.z); ctx.translate(-cam.x, -cam.y);
+  const px = 1 / cam.z;
+  ctx.lineCap = 'butt';
+  drawLayer(false, px);
+  drawLayer(true, px);
+  for (const ni of net.info.values()) {
+    const n = ni.node;
+    const sel = selection && selection.type === 'node' && selection.id === n.id, hov = hover && hover.type === 'node' && hover.id === n.id;
+    if (sel || hov || ((ui.tool === 'road' || ui.tool === 'bridge') && ni.deg >= 2 && !n.elevated)) {
+      ctx.strokeStyle = sel ? T.sel : hov ? T.sel : T.muted; ctx.globalAlpha = sel ? 1 : hov ? 0.6 : 0.35; ctx.lineWidth = 2.5 * px;
+      ctx.setLineDash(sel ? [] : [4 * px, 3 * px]);
+      ctx.beginPath(); ctx.arc(n.x, n.y, Math.max(ni.setback, 7 * px) + 3 * px, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+    }
+  }
+  let preview = null;
+  if ((ui.tool === 'road' || ui.tool === 'bridge') && drawFrom != null && model.nodes.get(drawFrom)) {
+    const A = model.nodes.get(drawFrom); const hn = nodeAt(mouseS[0], mouseS[1]);
+    const [tx, ty] = hn ? [hn.x, hn.y] : snapW(mouseW[0], mouseW[1]);
+    const [lf, lb] = newRoadSpec();
+    ctx.globalAlpha = 0.55; strokeSeg(A, { x: tx, y: ty }, T.sel, Math.max((lf + lb) * LW, 3 * px)); ctx.globalAlpha = 1;
+    preview = { tx, ty, len: Math.hypot(tx - A.x, ty - A.y) };
+  }
+  ctx.restore();
+  drawOverlays();
+  if (preview) { const [sx, sy] = w2s(preview.tx, preview.ty); pill(sx + 30, sy - 16, Math.round(preview.len) + ' m', T.ink, T.surface, { bold: true }); }
+  // scale bar
+  const target = 100 / cam.z, nice = [5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000].find(v => v >= target) || 5000;
+  const bw = nice * cam.z;
+  ctx.strokeStyle = T['ink-2']; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(W - 20 - bw, H - 20); ctx.lineTo(W - 20, H - 20); ctx.moveTo(W - 20 - bw, H - 25); ctx.lineTo(W - 20 - bw, H - 15); ctx.moveTo(W - 20, H - 25); ctx.lineTo(W - 20, H - 15); ctx.stroke();
+  ctx.fillStyle = T['ink-2']; ctx.font = '600 11px Overpass, system-ui'; ctx.textAlign = 'right'; ctx.fillText(nice + ' m', W - 20, H - 28); ctx.textAlign = 'left';
+}
+
+
+/* ------------------------------ panel UI ------------------------------ */
+function $(id) { return document.getElementById(id); }
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 6000); }
+function togglePlay() {
+  ui.running = !ui.running;
+  $('playLbl').textContent = ui.running ? 'Pause' : 'Play';
+  $('playIcon').innerHTML = ui.running ? '<rect x="2" y="1" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="8.5" y="1" width="3.5" height="12" rx="1" fill="currentColor"/>' : '<path d="M3 1.5v11l9.5-5.5z" fill="currentColor"/>';
+}
+$('play').onclick = togglePlay;
+$('undoBtn').onclick = undo; $('redoBtn').onclick = redo;
+const SPEEDS = [1, 2, 5, 10, 25];
+$('speeds').innerHTML = SPEEDS.map(s => `<button data-sp="${s}" class="${s === 1 ? 'on' : ''}">${s}×</button>`).join('');
+$('speeds').querySelectorAll('button').forEach(b => b.onclick = () => { ui.speed = +b.dataset.sp; $('speeds').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); });
+$('volume').oninput = e => { ui.demand = e.target.value / 100; $('volumeV').textContent = e.target.value + '%'; };
+$('volume').onchange = () => resetMetrics();
+$('heat').onchange = e => ui.heat = e.target.checked;
+ui.heat = true;
+$('smart').onchange = e => { ui.smart = e.target.checked; net.dist = computeRouting(ui.smart); };
+$('snap').onchange = e => ui.snap = e.target.checked;
+$('side').onchange = e => { model.driveSide = e.target.value; vehicles = []; rebuild(false); resetMetrics(); renderInspector(); };
+$('preset').onchange = () => { loadPreset($('preset').value); baseline = null; renderBaseline(); };
+$('clearVeh').onclick = () => { vehicles = []; for (const s of net.sources) s.pending = []; rebuild(false); resetMetrics(); };
+$('optimize').onclick = optimizeSignals;
+$('resetM').onclick = resetMetrics;
+
+// tabs
+function showTab(name) {
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  for (const p of ['results', 'edit', 'data']) $('pane-' + p).hidden = p !== name;
+}
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+// road type chips in the drawing options
+const kindChips = $('kindChips');
+kindChips.innerHTML = Object.entries(KINDS).map(([k, v]) => `<button class="chip ${k === 'street' ? 'on' : ''}" data-kind="${k}"><span class="sw" style="background:${k === 'highway' ? 'var(--road-hwy)' : k === 'service' ? 'var(--road-service)' : 'var(--road)'};height:${k === 'highway' ? 10 : k === 'service' ? 5 : 8}px"></span>${v.label}</button>`).join('');
+kindChips.querySelectorAll('.chip').forEach(c => c.onclick = () => {
+  kindChips.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === c));
+  $('newKind').value = c.dataset.kind; const k = KINDS[c.dataset.kind];
+  $('newLanes').value = String(k.lanes); $('newSpeed').value = String(k.speed);
+});
+$('newSpeed').value = '50';
+
+// tool changes also update the cursor and the drawing options
+const _setTool = setTool;
+setTool = function (t) {
+  _setTool(t);
+  $('drawOpts').hidden = !(t === 'road' || t === 'bridge');
+  cv.classList.toggle('drawing', t === 'road' || t === 'bridge');
+  cv.classList.toggle('deleting', t === 'delete');
+  cv.classList.toggle('panning', t === 'pan');
+};
+document.querySelectorAll('[data-tool]').forEach(b => { b.onclick = null; });
+document.querySelectorAll('.tool[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+
+// selecting something opens the Edit tab
+const _select = select;
+select = function (sel) { _select(sel); if (sel) showTab('edit'); };
+
+// legend
+$('legendToggle').onclick = () => { const b = $('legendBody'); b.style.display = b.style.display === 'none' ? 'grid' : 'none'; };
+
+// before / after
+let baseline = null;
+function renderBaseline() {
+  $('clearBase').hidden = !baseline;
+  $('saveBase').textContent = baseline ? 'Save again as before' : 'Save as before';
+  $('baseInfo').textContent = baseline
+    ? 'Before: ' + Math.round(baseline.thr) + ' cars/hour, ' + Math.round(baseline.delay) + ' s lost per trip (saved at ' + fmtClock(baseline.at) + '). The arrows on each number show the change.'
+    : 'Save the current numbers as "before", change something on the map, let it run 3 minutes, then compare.';
+}
+$('saveBase').onclick = () => {
+  const m = currentMetrics(); if (m.span < 180 || m.n < 5) { toast('Let it run at least 3 minutes after the last change so the numbers settle. Try the 10× speed.'); return; }
+  baseline = Object.assign({ at: simTime }, m); renderBaseline();
+};
+$('clearBase').onclick = () => { baseline = null; renderBaseline(); };
+
+$('exportBtn').onclick = () => { $('jsonBox').value = exportJSON(); };
+$('copyBtn').onclick = async () => { $('jsonBox').value = exportJSON(); try { await navigator.clipboard.writeText($('jsonBox').value); toast('Copied the network as text.'); } catch (e) { $('jsonBox').select(); toast('Text selected; press Ctrl or Cmd + C to copy.'); } };
+$('importBtn').onclick = () => { try { importJSON($('jsonBox').value); toast('Network loaded.'); } catch (e) { toast('Could not load that text: ' + e.message); } };
+function importOSMText(text) {
+  text = text.trim();
+  try { if (text[0] === '<') importOSM(parseOSMXML(text)); else { const d = JSON.parse(text); if (d.elements) importOSM(d); else importJSON(text); } }
+  catch (e) { toast('Could not import that map: ' + e.message); }
+}
+$('osmBtn').onclick = () => importOSMText($('osmBox').value);
+$('osmFile').onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(importOSMText); };
+
+function fmtClock(t) { t = Math.floor(t); const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60; return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0'); }
+function setDelta(id, cur, base, higherBetter, fmt) {
+  const el = $(id);
+  if (!baseline) { el.textContent = ''; el.className = 'delta'; return; }
+  const diff = cur - base, pct = base ? diff / base * 100 : (cur ? 100 : 0);
+  const better = higherBetter ? diff > 0 : diff < 0;
+  const same = Math.abs(pct) < 3 && Math.abs(diff) < 2;
+  el.className = 'delta ' + (same ? 'same' : better ? 'better' : 'worse');
+  el.textContent = same ? '≈ same as before' : (diff > 0 ? '▲ ' : '▼ ') + fmt(Math.abs(diff)) + ' ' + (better ? 'better' : 'worse');
+}
+
+/* plain-language status */
+function junctionName(ni) {
+  const names = [...new Set(ni.roads.map(r => r.name).filter(Boolean))];
+  if (names.length >= 2) return names.slice(0, 2).join(' / ');
+  return 'junction #' + ni.node.id;
+}
+function worstSpot() {
+  let best = null;
+  for (const ni of net.info.values()) {
+    for (const l of ni.inLinks) {
+      const q = queueOn(l);
+      if (!best || q > best.q) best = { q, ni, link: l };
+    }
+  }
+  return best;
+}
+let statusTarget = null;
+function updateStatus(m) {
+  const st = $('status');
+  let cls = 'st-idle', label = 'Starting up', text = 'Cars are entering the map. Results appear after a minute or two.';
+  statusTarget = null;
+  if (vehicles.length >= 5 || m.n > 0) {
+    let stopped = 0; for (const v of vehicles) if (v.v < 1) stopped++;
+    const frac = vehicles.length ? stopped / vehicles.length : 0;
+    const w = worstSpot();
+    if (vehicles.length > 30 && m.speed < 3) { cls = 'st-critical'; label = 'Gridlocked'; text = 'Almost nothing is moving. Cars are blocking each other across junctions.'; }
+    else if (frac > 0.55 || m.wait > 25) { cls = 'st-serious'; label = 'Congested'; text = Math.round(frac * 100) + '% of cars are stopped' + (m.wait > 25 ? ', and ' + m.wait + ' cannot even get onto the map' : '') + '.'; }
+    else if (frac > 0.3 || m.wait > 5) { cls = 'st-warn'; label = 'Busy'; text = 'Traffic moves, but ' + Math.round(frac * 100) + '% of cars are waiting at any moment.'; }
+    else { cls = 'st-good'; label = 'Flowing well'; text = 'Most cars move freely. Only ' + Math.round(frac * 100) + '% are stopped right now.'; }
+    if (w && w.q >= 6) {
+      text += ' Longest queue: ' + w.q + ' cars coming from the ' + compass(-w.link.d.x, -w.link.d.y) + ' at ' + (w.ni.deg >= 3 ? junctionName(w.ni) : 'a merge point') + '.';
+      statusTarget = w.ni;
+    }
+  }
+  st.className = 'status ' + cls; $('stLabel').textContent = label; $('stText').textContent = text;
+  $('stShow').hidden = !statusTarget;
+}
+$('stShow').onclick = () => {
+  if (!statusTarget) return;
+  cam.x = statusTarget.node.x; cam.y = statusTarget.node.y; cam.z = Math.max(cam.z, 1.6);
+  setTool('select'); select({ type: 'node', id: statusTarget.node.id });
+};
+
+function updateMetricsUI() {
+  const m = currentMetrics();
+  $('mThr').innerHTML = Math.round(m.thr) + '<small>/hour</small>';
+  $('mDelay').innerHTML = (m.delay >= 90 ? (m.delay / 60).toFixed(1) + '<small>min</small>' : Math.round(m.delay) + '<small>s</small>');
+  $('mSpeed').innerHTML = m.speed.toFixed(0) + '<small>km/h</small>';
+  $('mWait').innerHTML = m.wait + '<small>cars</small>';
+  $('mFoot').textContent = m.veh + ' cars on the roads · ' + completed + ' trips finished · averages over the last ' + (Math.min(m.span, WINDOW) / 60).toFixed(1) + ' min';
+  if (baseline) {
+    setDelta('dThr', m.thr, baseline.thr, true, v => Math.round(v) + '/h');
+    setDelta('dDelay', m.delay, baseline.delay, false, v => Math.round(v) + ' s');
+    setDelta('dSpeed', m.speed, baseline.speed, true, v => v.toFixed(0) + ' km/h');
+    setDelta('dWait', m.wait, baseline.wait, false, v => Math.round(v) + '');
+  } else ['dThr', 'dDelay', 'dSpeed', 'dWait'].forEach(id => { $(id).textContent = ''; });
+  updateStatus(m);
+  $('clock').textContent = fmtClock(simTime) + (ui.running ? '' : ' paused');
+  if (!$('pane-results').hidden) {
+    drawChart('chThr', 'tipThr', history.map(h => [h.t, h.thr]), v => Math.round(v) + ' cars/h', baseline && baseline.thr);
+    drawChart('chDelay', 'tipDelay', history.map(h => [h.t, h.delay]), v => Math.round(v) + ' s', baseline && baseline.delay);
+  }
+  if (selection) updateInspectorStats();
+}
+const chartHover = {};
+function drawChart(id, tipId, pts, fmt, baseVal) {
+  const c = $(id), r = c.getBoundingClientRect(); if (!r.width) return;
+  const dpr = window.devicePixelRatio || 1; if (c.width !== Math.round(r.width * dpr)) { c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); }
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, r.width, r.height);
+  const pad = { l: 36, r: 6, t: 6, b: 16 }, w = r.width - pad.l - pad.r, h = r.height - pad.t - pad.b;
+  let max = Math.max(1, baseVal || 0, ...pts.map(p => p[1])); const nice = Math.pow(10, Math.floor(Math.log10(max))); max = Math.ceil(max / nice) * nice;
+  g.strokeStyle = T.line; g.lineWidth = 1; g.fillStyle = T.muted; g.font = '10px Overpass Mono, monospace'; g.textAlign = 'right';
+  for (const f of [0, 0.5, 1]) { const y = pad.t + h - f * h; g.beginPath(); g.moveTo(pad.l, y); g.lineTo(pad.l + w, y); g.stroke(); g.fillText(pts.length < 2 ? '' : String(Math.round(max * f)), pad.l - 5, y + 3); }
+  g.textAlign = 'left';
+  if (pts.length < 2) { g.fillText('collecting data…', pad.l + 6, pad.t + h / 2); return; }
+  const t0 = pts[0][0], t1 = pts[pts.length - 1][0];
+  const X = t => pad.l + (t - t0) / Math.max(1, t1 - t0) * w, Y = v => pad.t + h - v / max * h;
+  if (baseVal != null) { g.strokeStyle = T.muted; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(pad.l, Y(baseVal)); g.lineTo(pad.l + w, Y(baseVal)); g.stroke(); g.setLineDash([]); g.fillText('before', pad.l + 4, Y(baseVal) - 4); }
+  g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])));
+  g.lineTo(X(t1), pad.t + h); g.lineTo(X(t0), pad.t + h); g.closePath(); g.globalAlpha = 0.12; g.fillStyle = T.accent; g.fill(); g.globalAlpha = 1;
+  g.strokeStyle = T.accent; g.lineWidth = 2; g.lineJoin = 'round'; g.beginPath();
+  pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.stroke();
+  const last = pts[pts.length - 1]; g.fillStyle = T.accent; g.beginPath(); g.arc(X(last[0]), Y(last[1]), 3, 0, Math.PI * 2); g.fill();
+  g.fillStyle = T.muted; g.fillText(fmtClock(t0), pad.l, r.height - 3); g.textAlign = 'right'; g.fillText(fmtClock(t1), pad.l + w, r.height - 3); g.textAlign = 'left';
+  const hv = chartHover[id], tip = $(tipId);
+  if (hv != null) {
+    let bi = 0, bd = Infinity; pts.forEach((p, i) => { const d = Math.abs(X(p[0]) - hv); if (d < bd) { bd = d; bi = i; } });
+    const p = pts[bi], x = X(p[0]), y = Y(p[1]);
+    g.strokeStyle = T.muted; g.lineWidth = 1; g.beginPath(); g.moveTo(x, pad.t); g.lineTo(x, pad.t + h); g.stroke();
+    g.fillStyle = T.accent; g.strokeStyle = T.surface; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 4, 0, Math.PI * 2); g.fill(); g.stroke();
+    tip.hidden = false; tip.textContent = fmtClock(p[0]) + '  ' + fmt(p[1]);
+    tip.style.left = Math.min(r.width - 120, Math.max(0, x - 50)) + 'px';
+  } else tip.hidden = true;
+}
+['chThr', 'chDelay'].forEach(id => {
+  const c = $(id);
+  c.addEventListener('pointermove', e => chartHover[id] = e.offsetX);
+  c.addEventListener('pointerleave', () => chartHover[id] = null);
+});
+
+/* hover tooltip on the map */
+function tipHTML(h) {
+  const T2 = Math.max(1, simTime - metricsStart);
+  const kv = (k, v) => `<div class="kv"><span>${k}</span><span>${v}</span></div>`;
+  if (h.type === 'road') {
+    const r = model.roads.get(h.id); if (!r) return null;
+    const ls = net.links.filter(l => l.road.id === r.id);
+    let n = 0, sv = 0, flow = 0; for (const l of ls) { flow += l.countIn; for (const ln of l.lanes) for (const v of ln.veh) { n++; sv += v.v; } }
+    const name = (r.name ? r.name.replace(/[<>&]/g, '') : (KINDS[r.kind] || KINDS.street).label) + (r.elevated ? ' (flyover)' : '');
+    const lanes = r.lanesF && r.lanesB ? r.lanesF + ' + ' + r.lanesB + ' lanes' : 'one-way, ' + (r.lanesF || r.lanesB) + ' lane' + ((r.lanesF || r.lanesB) > 1 ? 's' : '');
+    return `<b>${name}</b>${kv('Lanes', lanes)}${kv('Speed limit', r.speed + ' km/h')}${kv('Cars on it', n)}${kv('Their speed', n ? (sv / n * 3.6).toFixed(0) + ' km/h' : '–')}${kv('Flow', Math.round(flow / T2 * 3600) + ' cars/h')}<div class="note">Click to change lanes, type or speed.</div>`;
+  }
+  const ni = net.info.get(h.id); if (!ni) return null;
+  if (ni.deg === 1) return `<b>Entry and exit point</b>${kv('Cars arriving', Math.round(ni.node.demand * ui.demand) + '/h')}${kv('Stuck, cannot enter', ni.pending.length)}<div class="note">Click to change how many cars come in.</div>`;
+  if (ni.deg === 2) return `<b>${ni.node.elevated ? 'Flyover joint' : 'Bend'}</b><div class="note">Two roads meet here; no control needed.</div>`;
+  let q = 0; for (const l of ni.inLinks) q += queueOn(l);
+  const flow = ni.inLinks.reduce((a, l) => a + l.countIn, 0) / T2 * 3600;
+  const ctlName = { signal: 'Traffic signal', adaptive: 'Smart signal', stop: 'All-way stop', priority: 'Give way', none: 'No control' }[ni.node.control];
+  const bans = (ni.node.bans || []).length;
+  return `<b>${junctionName(ni)[0].toUpperCase() + junctionName(ni).slice(1)}</b>${kv('Control', ctlName)}${kv('Cars waiting', q)}${kv('Flow through', Math.round(flow) + ' cars/h')}${bans ? kv('Banned turns', bans) : ''}<div class="note">Click to change signals, ban turns or build a flyover.</div>`;
+}
+cv.addEventListener('pointermove', e => {
+  const tip = $('tip');
+  if (drag || !hover || ui.tool !== 'select') { tip.hidden = true; return; }
+  const html = tipHTML(hover); if (!html) { tip.hidden = true; return; }
+  tip.innerHTML = html; tip.hidden = false;
+  const r = $('stage').getBoundingClientRect();
+  let x = e.offsetX + 16, y = e.offsetY + 16;
+  if (x + 250 > r.width) x = e.offsetX - 256; if (y + 170 > r.height) y = e.offsetY - 176;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+});
+cv.addEventListener('pointerleave', () => { $('tip').hidden = true; hover = null; });
+
+/* quick-start guide */
+const COACH = [
+  ['This is a live traffic simulation', 'Each little rectangle is a car. Red tail lights mean the car is stopped. Roads turn amber or red where traffic is slow or jammed, and red bubbles show how many cars are queuing.'],
+  ['Change the roads with the tools on the left', 'Draw a road or a flyover by clicking point to point. Click an existing road to join it. Delete removes roads and junctions.'],
+  ['Click any junction or road to edit it', 'Junctions: switch signals, change green times, ban turns, or build a flyover. Roads: lanes, speed and type. Hover first to see live numbers.'],
+  ['See if it helped', 'Press "Save as before" on the Results tab, make your change, run it for 3 minutes (10× speed helps), and the numbers show what got better or worse.'],
+];
+let coachI = 0;
+function showCoach(i) {
+  coachI = i; if (i >= COACH.length) { $('coach').hidden = true; try { localStorage.setItem('ts-coach', '1'); } catch (e) {} return; }
+  $('coach').hidden = false; $('coachStep').textContent = (i + 1) + ' of ' + COACH.length;
+  $('coachTitle').textContent = COACH[i][0]; $('coachText').textContent = COACH[i][1];
+  $('coachNext').textContent = i === COACH.length - 1 ? 'Start' : 'Next';
+}
+$('coachNext').onclick = () => showCoach(coachI + 1);
+$('coachSkip').onclick = () => showCoach(COACH.length);
+$('helpBtn').onclick = () => showCoach(0);
+
+
+/* ------------------------------ inspector ------------------------------ */
+const CONTROL_NAMES = { signal: 'Traffic signal, fixed timing', adaptive: 'Smart signal, reacts to queues', stop: 'All-way stop', priority: 'Give way to the main road', none: 'No control (optimistic)' };
+const CONTROL_HELP = {
+  signal: 'Each direction gets its green in turn, then 3 s amber and 1.5 s all-red.',
+  adaptive: 'Green ends early once its queue clears and skips directions with nobody waiting. The green time below is the maximum.',
+  stop: 'Every car stops, then they go one at a time in arrival order. Low capacity.',
+  priority: 'Cars on the main road (most lanes, highest type) go freely. Others wait for a safe gap.',
+  none: 'Cars cross whenever there is space ahead. Crashes are not modelled, so this is a best case.',
+};
+function esc(s) { return String(s).replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c])); }
+function renderInspector() {
+  const el = $('inspector');
+  if (!selection || (selection.type === 'node' && !model.nodes.has(selection.id)) || (selection.type === 'road' && !model.roads.has(selection.id))) {
+    selection = null;
+    el.innerHTML = `<div class="empty"><h2>Nothing selected</h2><p style="margin:0">Click something on the map to change it.</p>
+      <ul><li><b>A junction</b>: switch signals or stop signs, change green times, ban turns, or build a flyover.</li>
+      <li><b>A road</b>: lanes in each direction, speed limit, road type, flyover, add a service road.</li>
+      <li><b>A blue entry point</b>: how many cars arrive there per hour.</li></ul>
+      <p class="small" style="margin:0">To add new roads, pick Road or Flyover in the tools on the left of the map.</p></div>`;
+    return;
+  }
+  let html = '';
+  if (selection.type === 'node') {
+    const n = model.nodes.get(selection.id), ni = net.info.get(n.id);
+    if (!ni) { el.innerHTML = ''; return; }
+    if (ni.deg === 1) {
+      html += `<div class="ins-head"><span class="name">Entry and exit point</span><span class="meta">Cars appear and leave the map here</span></div>
+        <div class="field"><label for="iDem">Cars arriving per hour</label><div class="row"><input type="range" id="iDem" min="0" max="2000" step="25" value="${n.demand}"><span class="val" id="iDemV">${n.demand}/h</span></div>
+        <span class="small">Busier points also attract more trips. The Traffic slider at the top scales every point.</span></div>
+        <div class="live" id="iStats"></div>`;
+    } else if (ni.deg === 2) {
+      html += `<div class="ins-head"><span class="name">${n.elevated ? 'Flyover joint' : 'Bend'}</span><span class="meta">Two roads meet here, so no control is needed</span></div>
+        <p class="small" style="margin:0">Draw a third road into this point to turn it into a junction.</p>`;
+    } else {
+      html += `<div class="ins-head"><span class="name">${esc(junctionName(ni)[0].toUpperCase() + junctionName(ni).slice(1))}</span><span class="meta">${ni.deg} roads meet here</span></div>
+        <div class="live" id="iStats"></div>
+        <div class="field"><label for="iCtl">How it is controlled</label><select id="iCtl" class="ctl">${Object.keys(CONTROL_NAMES).map(k => `<option value="${k}" ${n.control === k ? 'selected' : ''}>${CONTROL_NAMES[k]}</option>`).join('')}</select>
+        <span class="small">${CONTROL_HELP[n.control]}</span></div>`;
+      if ((n.control === 'signal' || n.control === 'adaptive') && ni.phases.length >= 2) {
+        const lostT = ni.phases.length * (YELLOW + ALLRED);
+        const cyc = ni.phases.reduce((a, _, p) => a + greenFor(ni, p), 0) + lostT;
+        html += `<div class="box"><h3>Green time per direction</h3><span class="small">One full cycle takes <b>${Math.round(cyc)} s</b>. Give more green to the busier direction.</span>`;
+        ni.phases.forEach((ph, p) => {
+          const label = 'Traffic from ' + ph.map(l => compass(-l.d.x, -l.d.y)).join(' and ');
+          html += `<div class="phase"><span class="small">${label}</span><div class="row"><input type="range" data-ph="${p}" min="5" max="90" value="${greenFor(ni, p)}" aria-label="${label} green time"><span class="val" id="iPhV${p}">${greenFor(ni, p)} s</span></div></div>`;
+        });
+        html += `</div>`;
+      }
+      const arms = armsOf(n.id), pairs = oppositePairs(arms), bans = new Set(n.bans || []);
+      const nearWord = model.driveSide === 'right' ? 'right' : 'left', farWord = nearWord === 'right' ? 'left' : 'right';
+      html += `<div class="box"><h3>Which way can cars go?</h3><div class="btns"><button class="btn" data-rule="all">Allow everything</button><button class="btn" data-rule="noFar" title="Ban turns that cut across oncoming traffic">No ${farWord} turns</button>`;
+      pairs.forEach((pr, i) => {
+        const ax = pr[0].name + '–' + pr[1].name;
+        html += `<button class="btn" data-rule="axisOnly" data-pair="${i}" title="Only straight-through traffic along ${ax}; other roads are closed here">Only ${ax} straight through</button>
+          <button class="btn" data-rule="median" data-pair="${i}" title="A divider along ${ax}: it goes straight, everyone may turn ${nearWord}, nobody crosses it">Divider on ${ax}</button>
+          <button class="btn" data-rule="noCross" data-pair="${i}" title="Traffic on ${ax} may turn here but not go straight across">Stop ${ax} going straight across</button>`;
+      });
+      const ins = arms.filter(x => x.canIn), outs = arms.filter(x => x.canOut);
+      html += `</div><div style="overflow-x:auto"><table class="mv"><tr><td>from ↓ to →</td>${outs.map(b => `<td>${b.name}</td>`).join('')}</tr>`;
+      for (const a of ins) {
+        html += `<tr><td>${a.name}</td>`;
+        for (const b of outs) {
+          if (a === b) { html += '<td style="color:var(--muted)">·</td>'; continue; }
+          const k = a.road.id + '>' + b.road.id;
+          html += `<td><input type="checkbox" data-mv="${k}" ${bans.has(k) ? '' : 'checked'} aria-label="${a.name} to ${b.name}" title="${a.name} → ${b.name} (${movementType(a, b)})"></td>`;
+        }
+        html += '</tr>';
+      }
+      html += `</table></div><span class="small">Unticked turns are banned; drivers find another route.</span></div>`;
+      if (pairs.length) {
+        html += `<div class="box"><h3>Build a flyover</h3><span class="small">Straight-through traffic goes over the junction. Turning traffic uses one-way service roads underneath and the junction below.</span><div class="btns">`;
+        pairs.forEach((pr, i) => { html += `<button class="btn primary" data-fly="${i}">Flyover ${pr[0].name}–${pr[1].name}</button>`; });
+        html += `</div></div>`;
+      }
+    }
+    html += `<div class="btns"><button class="btn danger" id="iDel">Delete this point</button></div>`;
+    el.innerHTML = html;
+    if ($('iDem')) { $('iDem').oninput = e => { n.demand = +e.target.value; $('iDemV').textContent = n.demand + '/h'; }; $('iDem').onchange = () => { resetMetrics(); commitHistory(); }; }
+    if ($('iCtl')) $('iCtl').onchange = e => { n.control = e.target.value; afterEdit(false); };
+    el.querySelectorAll('[data-ph]').forEach(inp => {
+      inp.oninput = e => { const p = +e.target.dataset.ph; if (!n.phaseGreens || n.phaseGreens.length !== ni.phases.length) n.phaseGreens = ni.phases.map((_, k) => greenFor(ni, k)); n.phaseGreens[p] = +e.target.value; $('iPhV' + p).textContent = e.target.value + ' s'; };
+      inp.onchange = () => { resetMetrics(); renderInspector(); commitHistory(); };
+    });
+    if (ni.deg >= 3) {
+      const arms = armsOf(n.id), pairs = oppositePairs(arms);
+      el.querySelectorAll('[data-rule]').forEach(b => b.onclick = () => {
+        setMovementRule(n.id, b.dataset.rule, b.dataset.pair != null ? pairs[+b.dataset.pair] : null);
+        if (b.dataset.rule === 'axisOnly' || b.dataset.rule === 'median') toast('Turns updated. With fewer conflicts, "Give way" control often works better than signals here.');
+        afterEdit();
+      });
+      el.querySelectorAll('[data-mv]').forEach(c => c.onchange = () => { const [f, t] = c.dataset.mv.split('>'); toggleMovement(n.id, f, t); afterEdit(); });
+      el.querySelectorAll('[data-fly]').forEach(b => b.onclick = () => { if (makeFlyover(n.id, pairs[+b.dataset.fly])) { afterEdit(); toast('Flyover built. Straight traffic goes over; turning traffic uses the service roads below.'); } });
+    }
+  } else {
+    const r = model.roads.get(selection.id), A = model.nodes.get(r.a), B = model.nodes.get(r.b);
+    const L = Math.hypot(B.x - A.x, B.y - A.y);
+    const dirAB = compass(B.x - A.x, B.y - A.y), dirBA = compass(A.x - B.x, A.y - B.y);
+    const opt = (v) => [0, 1, 2, 3, 4].map(k => `<option value="${k}" ${k === v ? 'selected' : ''}>${k}</option>`).join('');
+    const flyEnds = [];
+    for (const endId of [r.a, r.b]) {
+      const eni = net.info.get(endId); if (!eni || eni.deg < 3 || r.elevated) continue;
+      const pr = oppositePairs(armsOf(endId)).find(p => p.some(a => a.road.id === r.id));
+      if (pr) flyEnds.push({ node: endId, pair: pr, dir: compass(model.nodes.get(endId).x - (endId === r.a ? B.x : A.x), model.nodes.get(endId).y - (endId === r.a ? B.y : A.y)) });
+    }
+    html += `<div class="ins-head"><span class="name">${r.name ? esc(r.name) : (KINDS[r.kind] || KINDS.street).label}${r.elevated ? ' (flyover)' : ''}</span><span class="meta">${Math.round(L)} m long</span></div>
+      <div class="live" id="iStats"></div>
+      <div class="field"><span class="flabel">Lanes</span><div class="row"><label class="small" for="iLF">heading ${dirAB}</label><select id="iLF" class="ctl">${opt(r.lanesF)}</select><label class="small" for="iLB">heading ${dirBA}</label><select id="iLB" class="ctl">${opt(r.lanesB)}</select></div>
+        <span class="small">Set one direction to 0 for a one-way road.</span></div>
+      <div class="field"><label for="iSp">Speed limit</label><div class="row"><input type="range" id="iSp" min="20" max="120" step="10" value="${r.speed}"><span class="val" id="iSpV">${r.speed} km/h</span></div></div>
+      <div class="field"><span class="flabel">Road type</span><div class="chips" id="iKinds">${Object.keys(KINDS).map(k => `<button class="chip ${r.kind === k ? 'on' : ''}" data-k="${k}">${KINDS[k].label}</button>`).join('')}</div>
+        <span class="small">At give-way junctions the higher type has priority: highway, main road, street, service road.</span></div>
+      <label class="check"><input type="checkbox" id="iElev" ${r.elevated ? 'checked' : ''}> Flyover or bridge (passes over the roads it crosses)</label>
+      ${flyEnds.length ? `<div class="box"><h3>Take this road over a junction</h3><span class="small">Builds a flyover for straight-through traffic, with one-way service roads below for turning traffic.</span><div class="btns">${flyEnds.map((f, i) => `<button class="btn primary" data-flyend="${i}">Flyover over the ${f.dir} junction</button>`).join('')}</div></div>` : ''}
+      <div class="btns"><button class="btn" id="iSvc2">Service roads on both sides</button><button class="btn" id="iSvc">Service road on one side</button>${r.lanesB === 0 || r.lanesF === 0 ? '<button class="btn" id="iRev">Reverse one-way direction</button>' : ''}<button class="btn danger" id="iDel">Delete road</button></div>`;
+    el.innerHTML = html;
+    const setLanes = () => {
+      const lf = +$('iLF').value, lb = +$('iLB').value;
+      if (lf + lb === 0) { toast('A road needs at least one lane.'); renderInspector(); return; }
+      r.lanesF = lf; r.lanesB = lb; afterEdit();
+    };
+    $('iLF').onchange = setLanes; $('iLB').onchange = setLanes;
+    $('iSp').oninput = e => { $('iSpV').textContent = e.target.value + ' km/h'; };
+    $('iSp').onchange = e => { r.speed = +e.target.value; afterEdit(false); };
+    el.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { r.kind = b.dataset.k; delete r.rank; afterEdit(false); });
+    $('iElev').onchange = e => { r.elevated = e.target.checked; afterEdit(false); };
+    el.querySelectorAll('[data-flyend]').forEach(b => b.onclick = () => { const f = flyEnds[+b.dataset.flyend]; if (makeFlyover(f.node, f.pair)) { selection = { type: 'node', id: f.node }; afterEdit(); toast('Flyover built. To stop cross traffic going straight over the junction below, use "Stop … going straight across" here.'); } });
+    $('iSvc2').onclick = () => { if (addServiceRoad(r.id, true)) { selection = null; afterEdit(); toast('One-way service roads added on both sides, joined by give-way slip roads at each end.'); } };
+    $('iSvc').onclick = () => { if (addServiceRoad(r.id)) { selection = null; afterEdit(); toast('Service road added beside it, joined by give-way slip roads at both ends.'); } };
+    if ($('iRev')) $('iRev').onclick = () => { [r.lanesF, r.lanesB] = [r.lanesB, r.lanesF]; afterEdit(); };
+  }
+  $('iDel').onclick = () => { if (selection.type === 'node') deleteNode(selection.id); else deleteRoad(selection.id); selection = null; afterEdit(); };
+  updateInspectorStats();
+}
+function updateInspectorStats() {
+  const el = $('iStats'); if (!el || !selection) return;
+  const T2 = Math.max(1, simTime - metricsStart);
+  if (selection.type === 'road') {
+    const ls = net.links.filter(l => l.road.id === selection.id);
+    el.innerHTML = ls.map(l => {
+      let n = 0, sv = 0; for (const ln of l.lanes) for (const v of ln.veh) { n++; sv += v.v; }
+      return 'heading ' + compass(l.d.x, l.d.y) + ': ' + n + ' cars, ' + (n ? (sv / n * 3.6).toFixed(0) + ' km/h' : '–') + ', ' + Math.round(l.countIn / T2 * 3600) + '/h';
+    }).join('<br>') || 'no lanes';
+  } else {
+    const ni = net.info.get(selection.id); if (!ni) return;
+    if (ni.deg === 1) el.textContent = ni.pending.length + ' cars stuck waiting to enter';
+    else {
+      let q = 0; for (const l of ni.inLinks) q += queueOn(l);
+      const flow = ni.inLinks.reduce((a, l) => a + l.countIn, 0) / T2 * 3600;
+      el.textContent = 'now: ' + q + ' cars waiting · ' + Math.round(flow) + ' cars/h through';
+    }
+  }
+}
+
+
+/* ------------------------------ main loop ------------------------------ */
+let lastTs = performance.now(), acc = 0, lastUI = 0;
+function frame(ts) {
+  const real = Math.min(0.1, (ts - lastTs) / 1000); lastTs = ts;
+  if (ui.running) {
+    acc += real * ui.speed; let n = 0; const t0 = performance.now();
+    while (acc >= DT && n < 600) { step(); acc -= DT; n++; if ((n & 15) === 0 && performance.now() - t0 > 30) { acc = 0; break; } }
+  }
+  panByKeys(real);
+  draw();
+  if (ts - lastUI > 400) { lastUI = ts; updateMetricsUI(); }
+  requestAnimationFrame(frame);
+}
+try { new ResizeObserver(() => resize()).observe($('stage')); } catch (e) {}
+resize();
+updateHint();
+loadPreset('grid');
+renderInspector();
+renderBaseline();
+try { if (!localStorage.getItem('ts-coach')) showCoach(0); } catch (e) { showCoach(0); }
+requestAnimationFrame(frame);
+window.sim = { undo: () => undo(), redo: () => redo(), w2s: (x, y) => w2s(x, y), step, model, get net() { return net; }, get vehicles() { return vehicles; }, currentMetrics, loadPreset, optimizeSignals, importOSM, parseOSMXML, importJSON, exportJSON, ui, get time() { return simTime; }, showCoach };
+
+</script>
+
+</body></html>
