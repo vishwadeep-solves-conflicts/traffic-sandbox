@@ -2,7 +2,7 @@
 
 A traffic simulator that runs in your browser. Draw roads, time the signals, ban turns, add a flyover, or import a real neighbourhood from OpenStreetMap. Then watch whether the jams actually get better.
 
-**Live:** LIVE_URL
+**Live:** https://vishwadeep-solves-conflicts.github.io/traffic-sandbox/
 
 ![Traffic Sandbox running the 9-signal city grid](screenshot.png)
 
