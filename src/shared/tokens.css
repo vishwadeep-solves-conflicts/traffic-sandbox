@@ -1,0 +1,18 @@
+/* The shared palette, the same values as the portfolio and the hub.
+   Apps map their own colour variables onto these, so all three themes look like one family. */
+:root,
+[data-theme="midnight"] {
+  --vk-bg: #0c0c0e; --vk-surface: #141417; --vk-surface-2: #1b1b20; --vk-border: #26262c; --vk-border-strong: #3a3a42;
+  --vk-text: #f4f4f5; --vk-muted: #a1a1aa; --vk-faint: #71717a; --vk-accent: #bef264; --vk-on-accent: #0c0c0e;
+  color-scheme: dark;
+}
+[data-theme="navy"] {
+  --vk-bg: #061a33; --vk-surface: #0b2545; --vk-surface-2: #0f2d52; --vk-border: #12335a; --vk-border-strong: #2a5180;
+  --vk-text: #e2ecf8; --vk-muted: #a9bdd6; --vk-faint: #7d97b8; --vk-accent: #67e8f9; --vk-on-accent: #061a33;
+  color-scheme: dark;
+}
+[data-theme="white"] {
+  --vk-bg: #ffffff; --vk-surface: #f8fafc; --vk-surface-2: #f1f5f9; --vk-border: #e5e7eb; --vk-border-strong: #cbd5e1;
+  --vk-text: #111827; --vk-muted: #4b5563; --vk-faint: #6b7280; --vk-accent: #3730a3; --vk-on-accent: #ffffff;
+  color-scheme: light;
+}

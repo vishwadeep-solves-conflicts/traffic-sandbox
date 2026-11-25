@@ -1,0 +1,51 @@
+/* Colours for the map and the panels. The map canvas reads these with getComputedStyle
+   (see map/theme.js), so every variable it reads must be a plain colour, not color-mix().
+   Panel surfaces, text and the accent come from the shared palette (shared/tokens.css). */
+:root {
+  --surface: var(--vk-surface);
+  --surface-2: var(--vk-surface-2);
+  --line: var(--vk-border);
+  --ink: var(--vk-text);
+  --muted: var(--vk-muted);
+  --accent: var(--vk-accent);
+  --accent-ink: var(--vk-on-accent);
+  --accent-soft: color-mix(in srgb, var(--vk-accent) 18%, var(--vk-surface));
+  --sig-green: #18b35c; --sig-amber: #f0a500; --sig-red: #e0302f;
+  --font-ui: "Overpass", "Segoe UI", system-ui, sans-serif;
+  --font-num: "Overpass Mono", ui-monospace, Menlo, monospace;
+  --radius: 10px;
+}
+
+/* Midnight (the default): neutral dark map */
+:root,
+[data-theme="midnight"] {
+  --paper: #121214; --paper-grid: rgba(255, 255, 255, 0.035); --block: #18181b;
+  --road: #3a3a40; --road-edge: #232327; --road-service: #333338; --road-hwy: #4a4636; --hwy-edge: #6b6140;
+  --mark: #71717a; --center: #c9a03e; --bridge: #4a4a52; --bridge-edge: #a1a1aa; --shadow: rgba(0, 0, 0, 0.5);
+  --ink-2: #c4c4cc;
+  --good: #47c27e; --warn: #e3b13f; --serious: #ec8a55; --critical: #f0605c;
+  --good-soft: #17271d; --warn-soft: #2e2818; --serious-soft: #311f17; --critical-soft: #321b1c;
+  --sig-body: #0a0a0b; --sel: #5aa2ff;
+}
+
+/* Navy: blue-tinted dark map */
+[data-theme="navy"] {
+  --paper: #08213f; --paper-grid: rgba(255, 255, 255, 0.04); --block: #0b2747;
+  --road: #2c4a6e; --road-edge: #15304f; --road-service: #27425f; --road-hwy: #4a4636; --hwy-edge: #6b6140;
+  --mark: #6f8bb0; --center: #c9a03e; --bridge: #3a5a80; --bridge-edge: #a9bdd6; --shadow: rgba(0, 0, 0, 0.5);
+  --ink-2: #c4d3e6;
+  --good: #47c27e; --warn: #e3b13f; --serious: #ec8a55; --critical: #f0605c;
+  --good-soft: #0f3330; --warn-soft: #2c2e25; --serious-soft: #2f2628; --critical-soft: #30222d;
+  --sig-body: #04101f; --sel: #67e8f9;
+}
+
+/* White: the original light map */
+[data-theme="white"] {
+  --paper: #eef0ea; --paper-grid: rgba(60, 72, 60, 0.06); --block: #e3e7de;
+  --road: #ffffff; --road-edge: #c9cec4; --road-service: #f6f3ea; --road-hwy: #fdf1cf; --hwy-edge: #e0c77a;
+  --mark: #c3c8bd; --center: #e2b13c; --bridge: #fbfbf8; --bridge-edge: #8f978b; --shadow: rgba(30, 40, 30, 0.22);
+  --ink-2: #4b5563;
+  --good: #1f8a52; --warn: #c98a0b; --serious: #d0602a; --critical: #c42b2b;
+  --good-soft: #e1f3e8; --warn-soft: #fbf0d6; --serious-soft: #fbe5d9; --critical-soft: #f8dcdc;
+  --sig-body: #26302a; --sel: #1b74e4;
+}

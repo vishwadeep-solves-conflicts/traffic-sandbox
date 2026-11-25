@@ -4,7 +4,7 @@ A traffic simulator that runs in your browser. Draw roads, time the signals, ban
 
 **Live:** https://vishwadeep-solves-conflicts.github.io/traffic-sandbox/
 
-![Traffic Sandbox running the 9-signal city grid](screenshot.png)
+![Traffic Sandbox running the 9-signal city grid](public/screenshot.png)
 
 ## What you can do
 
@@ -18,7 +18,7 @@ A traffic simulator that runs in your browser. Draw roads, time the signals, ban
 
 ## How it works
 
-It's one HTML file with no build step and no dependencies.
+It's a React app built with Vite. React lays out the page; the simulation itself is plain JavaScript with no other dependencies.
 
 - **Cars:** each one is simulated individually, using the [Intelligent Driver Model](https://en.wikipedia.org/wiki/Intelligent_driver_model) for following, braking and queuing. About 7% are trucks.
 - **Routes:** every car heads for a destination and takes the shortest route to it. Smart routing also avoids lanes that are already full.
@@ -29,11 +29,48 @@ The panel on the right turns all of this into live numbers and charts over a rol
 
 ## Run it locally
 
+You need Node 20 or newer.
+
 ```bash
 git clone https://github.com/vishwadeep-solves-conflicts/traffic-sandbox
 cd traffic-sandbox
-python3 -m http.server 8000   # or just open index.html
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # production build in dist/
 ```
+
+## Where things are
+
+```
+src/
+  engine/              the simulation, no DOM
+    model.js           junctions and roads, and edits like flyovers and service roads
+    network.js         lanes, signal phases and priority built from the model
+    routing.js         shortest routes to every exit
+    vehicles.js        cars and trucks, the Intelligent Driver Model, lane choice
+    control.js         signals, stops and give-way rules
+    connectors.js      paths through junctions
+    simulation.js      one time step, metrics, the signal optimiser
+    presets.js         the example networks
+    importExport.js    save/load as text, OpenStreetMap import
+    history.js         undo and redo
+    state.js           shared changing state (network, cars, clock)
+    constants.js       lane width, time step, road types
+  map/                 the canvas: camera, mouse and keyboard, drawing, colours
+  panels/              the side panel: results, inspector, charts, tooltip, guide
+  components/          React markup for the page (top bar, tools, panels)
+  styles/
+    theme.css          map and panel colours for each theme
+    app.css            layout
+  shared/              theme switcher and top bar, the same in every app
+  startEngine.js       starts everything and runs the frame loop
+```
+
+React renders the page once. `startEngine()` then wires the controls by their `id`s, and the engine updates the canvas and panels directly every frame, which keeps the simulation fast. To try things from the browser console, use `window.sim` (for example `sim.loadPreset('busy')` or `sim.currentMetrics()`).
+
+## Deploying
+
+Every push to `main` runs `.github/workflows/deploy.yml`, which builds the app and publishes `dist/` to the `gh-pages` branch. GitHub Pages serves that branch, and the self-hosted server copies it.
 
 ## Map data
 
